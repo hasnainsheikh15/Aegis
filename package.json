@@ -1,0 +1,14 @@
+{
+  "name": "aegis",
+  "private": true,
+  "packageManager": "pnpm@10",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev"
+  },
+  "type": "module",
+  "devDependencies": {
+    "turbo": "^2.10.6",
+    "typescript": "^6.0.3"
+  }
+}
