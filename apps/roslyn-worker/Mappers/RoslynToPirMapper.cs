@@ -11,6 +11,8 @@ public class RoslynToPirMapper
 {
     private readonly Dictionary<SyntaxNode, PirNode> nodeLookup = [];
 
+    private readonly Dictionary<string, PirNode> symbolLookup = [];
+
     private SemanticModel? semanticModel;
 
     public PirPackage MapCompilationUnit(SyntaxNode root, SemanticModel semanticModel)
@@ -129,13 +131,26 @@ public class RoslynToPirMapper
 
     private void MapMethod(MethodDeclarationSyntax methodNode, PirPackage pirPackage)
     {
-        PirNode pirNode = CreateNode(
+        PirNode pirMethod = CreateNode(
             pirPackage,
             methodNode,
             PirNodeType.Method,
             methodNode.Identifier.Text,
             methodNode.ReturnType.ToString()
         );
+
+        IMethodSymbol? methodSymbol =
+            semanticModel?.GetDeclaredSymbol(methodNode);
+
+        string? symbolId =
+            methodSymbol?.GetDocumentationCommentId();
+
+        if (symbolId is not null)
+        {
+            symbolLookup[symbolId] = pirMethod;
+        }
+
+        Console.WriteLine(symbolId);
 
         SyntaxNode? parent = methodNode.Parent;
 
@@ -147,7 +162,7 @@ public class RoslynToPirMapper
             CreateRelationship(
                 pirPackage,
                 parentPirNode,
-                pirNode,
+                pirMethod,
                 PirRelationshipType.DECLARES
             );
         }
@@ -270,12 +285,42 @@ public class RoslynToPirMapper
     {
         MethodDeclarationSyntax? callerMethod =
             invocationNode.FirstAncestorOrSelf<MethodDeclarationSyntax>();
-        
+
+        if (callerMethod is null) return;
+
+        IMethodSymbol? callerSymbol =
+            semanticModel?.GetDeclaredSymbol(callerMethod);
+
+        string? callerId =
+            callerSymbol?.GetDocumentationCommentId();
+
+        Console.WriteLine($"Caller: {callerId}");    
+
         IMethodSymbol? calledMethodSymbol =
             semanticModel?
                 .GetSymbolInfo(invocationNode)
                 .Symbol as IMethodSymbol;
+
+        string? calledId =
+            calledMethodSymbol?.GetDocumentationCommentId();
+        Console.WriteLine(symbolLookup.ContainsKey(callerId!));
+        Console.WriteLine(symbolLookup.ContainsKey(calledId!));
         
+        if (
+            callerId is not null &&
+            calledId is not null &&
+            symbolLookup.TryGetValue(callerId, out PirNode? callerPir) &&
+            symbolLookup.TryGetValue(calledId, out PirNode? calledPir)
+        )
+        {
+            CreateRelationship(
+                pirPackage,
+                callerPir,
+                calledPir,
+                PirRelationshipType.CALLS
+            );
+        }
+
         if (calledMethodSymbol is null)
         {
             Console.WriteLine("Could not resolve invocation.");
@@ -287,4 +332,9 @@ public class RoslynToPirMapper
             );
         }
     }
+    
+
+
+
+
 }
