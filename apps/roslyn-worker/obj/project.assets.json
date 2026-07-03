@@ -395,11 +395,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+      "projectUniqueName": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
       "projectName": "RoslynWorker",
-      "projectPath": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+      "projectPath": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
       "packagesPath": "C:\\Users\\mdhas\\.nuget\\packages\\",
-      "outputPath": "D:\\Aegis\\apps\\roslyn-worker\\obj\\",
+      "outputPath": "d:\\Aegis\\apps\\roslyn-worker\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -1,9 +1,19 @@
+using System;
+
 namespace Demo;
 
-public class Program
+public class User
 {
-    public static void Main(string[] args)
+    // public static void main (String [] args) {}
+
+    public void Login(string email)
     {
-        Console.WriteLine("Hello Aegis");
+        Validate();
+
+        Console.WriteLine(email);
+    }
+
+    private void Validate()
+    {
     }
 }
