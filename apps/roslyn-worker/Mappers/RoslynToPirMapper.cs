@@ -1,9 +1,8 @@
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynWorker.Models;
 using RoslynWorker.Models.Enums;
-
 
 namespace RoslynWorker.Mappers;
 
@@ -21,12 +20,62 @@ public class RoslynToPirMapper
 
         PirPackage pirPackage = new();
 
-        Visit(root, pirPackage);
+        visitDeclaration(root, pirPackage);
+
+        visitBehaviour(root, pirPackage);
 
         return pirPackage;
     }
 
-    private void Visit(SyntaxNode node, PirPackage pirPackage)
+    // private void Visit(SyntaxNode node, PirPackage pirPackage)
+    // {
+    //     if (node is ClassDeclarationSyntax classNode)
+    //     {
+    //         Mapclass(classNode, pirPackage);
+    //     }
+
+    //     if (node is MethodDeclarationSyntax methodNode)
+    //     {
+    //         MapMethod(methodNode, pirPackage);
+    //     }
+
+    //     if (node is FileScopedNamespaceDeclarationSyntax namespaceNode)
+    //     {
+    //         MapNamespace(namespaceNode, pirPackage);
+    //     }
+
+    //     if (node is ConstructorDeclarationSyntax constructorNode)
+    //     {
+    //         MapConstructor(constructorNode, pirPackage);
+    //     }
+
+    //     if (node is ParameterSyntax parameterNode)
+    //     {
+    //         MapParameter(parameterNode, pirPackage);
+    //     }
+
+    //     if (node is PropertyDeclarationSyntax propertyNode)
+    //     {
+    //         MapProperty(propertyNode, pirPackage);
+    //     }
+
+    //     if (node is FieldDeclarationSyntax fieldNode)
+    //     {
+    //         MapField(fieldNode, pirPackage);
+    //     }
+
+    //     if (node is InvocationExpressionSyntax invocationNode)
+    //     {
+    //         MapInvocation(invocationNode, pirPackage);
+    //     }
+
+    //     foreach (var child in node.ChildNodes())
+    //     {
+    //         Visit(child, pirPackage);
+    //     }
+    // }
+
+    private void visitDeclaration(SyntaxNode node, PirPackage pirPackage)
     {
         if (node is ClassDeclarationSyntax classNode)
         {
@@ -63,26 +112,54 @@ public class RoslynToPirMapper
             MapField(fieldNode, pirPackage);
         }
 
+        if (node is InterfaceDeclarationSyntax interfaceNode)
+        {
+            MapInterface(interfaceNode, pirPackage);
+        }
+
+        foreach (var child in node.ChildNodes())
+        {
+            visitDeclaration(child, pirPackage);
+        }
+    }
+
+    private void visitBehaviour(SyntaxNode node, PirPackage pirPackage)
+    {
         if (node is InvocationExpressionSyntax invocationNode)
         {
             MapInvocation(invocationNode, pirPackage);
         }
 
+        if (node is ClassDeclarationSyntax classNode)
+        {
+            MapInheritance(classNode, pirPackage);
+        }
+
+        if (node is ClassDeclarationSyntax interfaceNode)
+        {
+            MapImplements(interfaceNode, pirPackage);
+        }
+
         foreach (var child in node.ChildNodes())
         {
-            Visit(child, pirPackage);
+            visitBehaviour(child, pirPackage);
         }
     }
 
-    private PirNode CreateNode(PirPackage pirPackage, SyntaxNode syntaxNode, PirNodeType type, string name,
-        string? dataType = null)
+    private PirNode CreateNode(
+        PirPackage pirPackage,
+        SyntaxNode syntaxNode,
+        PirNodeType type,
+        string name,
+        string? dataType = null
+    )
     {
         PirNode pirNode = new()
         {
             Id = Guid.NewGuid().ToString(),
             Type = type,
             Name = name,
-            DataType = dataType
+            DataType = dataType,
         };
 
         pirPackage.Nodes.Add(pirNode);
@@ -90,7 +167,6 @@ public class RoslynToPirMapper
 
         return pirNode;
     }
-
 
     private void CreateRelationship(
         PirPackage pirPackage,
@@ -104,16 +180,28 @@ public class RoslynToPirMapper
             {
                 SourceId = source.Id,
                 TargetId = target.Id,
-                Type = type
-            });
+                Type = type,
+            }
+        );
     }
 
     private void Mapclass(ClassDeclarationSyntax classNode, PirPackage pirPackage)
     {
-        PirNode pirClass = CreateNode(pirPackage,
+        PirNode pirClass = CreateNode(
+            pirPackage,
             classNode,
             PirNodeType.Class,
-            classNode.Identifier.Text);
+            classNode.Identifier.Text
+        );
+
+        INamedTypeSymbol? classSymbol = semanticModel?.GetDeclaredSymbol(classNode);
+
+        string? symbolId = classSymbol?.GetDocumentationCommentId();
+
+        if (symbolId is not null)
+        {
+            symbolLookup[symbolId] = pirClass;
+        }
 
         SyntaxNode? parent = classNode.Parent;
 
@@ -121,11 +209,7 @@ public class RoslynToPirMapper
         {
             var parentPirNode = nodeLookup[parentNamespace];
 
-            CreateRelationship(
-                pirPackage,
-                parentPirNode,
-                pirClass,
-                PirRelationshipType.CONTAINS);
+            CreateRelationship(pirPackage, parentPirNode, pirClass, PirRelationshipType.CONTAINS);
         }
     }
 
@@ -139,11 +223,9 @@ public class RoslynToPirMapper
             methodNode.ReturnType.ToString()
         );
 
-        IMethodSymbol? methodSymbol =
-            semanticModel?.GetDeclaredSymbol(methodNode);
+        IMethodSymbol? methodSymbol = semanticModel?.GetDeclaredSymbol(methodNode);
 
-        string? symbolId =
-            methodSymbol?.GetDocumentationCommentId();
+        string? symbolId = methodSymbol?.GetDocumentationCommentId();
 
         if (symbolId is not null)
         {
@@ -154,23 +236,33 @@ public class RoslynToPirMapper
 
         SyntaxNode? parent = methodNode.Parent;
 
-
         if (parent is ClassDeclarationSyntax parentClass)
         {
             var parentPirNode = nodeLookup[parentClass];
 
+            CreateRelationship(pirPackage, parentPirNode, pirMethod, PirRelationshipType.DECLARES);
+        }
+
+        if (parent is InterfaceDeclarationSyntax interfaceNode)
+        {
+            PirNode parentNode = nodeLookup[interfaceNode];
+
             CreateRelationship(
                 pirPackage,
-                parentPirNode,
+                parentNode,
                 pirMethod,
                 PirRelationshipType.DECLARES
-            );
-        }
+    );
+}
     }
 
-    private void MapNamespace(FileScopedNamespaceDeclarationSyntax namespaceNode, PirPackage pirPackage)
+    private void MapNamespace(
+        FileScopedNamespaceDeclarationSyntax namespaceNode,
+        PirPackage pirPackage
+    )
     {
-        PirNode pirNamespace = CreateNode(pirPackage,
+        PirNode pirNamespace = CreateNode(
+            pirPackage,
             namespaceNode,
             PirNodeType.Namespace,
             namespaceNode.Name.ToString()
@@ -179,10 +271,12 @@ public class RoslynToPirMapper
 
     private void MapConstructor(ConstructorDeclarationSyntax constructorNode, PirPackage pirPackage)
     {
-        PirNode pirConstructor = CreateNode(pirPackage,
+        PirNode pirConstructor = CreateNode(
+            pirPackage,
             constructorNode,
             PirNodeType.Constructor,
-            constructorNode.Identifier.Text);
+            constructorNode.Identifier.Text
+        );
 
         SyntaxNode? parent = constructorNode.Parent;
 
@@ -190,10 +284,12 @@ public class RoslynToPirMapper
         {
             var parentPirNode = nodeLookup[parentClass];
 
-            CreateRelationship(pirPackage,
+            CreateRelationship(
+                pirPackage,
                 parentPirNode,
                 pirConstructor,
-                PirRelationshipType.DECLARES);
+                PirRelationshipType.DECLARES
+            );
         }
     }
 
@@ -213,20 +309,14 @@ public class RoslynToPirMapper
         {
             PirNode parentNode = nodeLookup[methodNode];
 
-            CreateRelationship(pirPackage,
-                parentNode,
-                pirNode,
-                PirRelationshipType.DECLARES);
+            CreateRelationship(pirPackage, parentNode, pirNode, PirRelationshipType.DECLARES);
         }
 
         if (owner is ConstructorDeclarationSyntax constructorNode)
         {
             PirNode parentNode = nodeLookup[constructorNode];
 
-            CreateRelationship(pirPackage,
-                parentNode,
-                pirNode,
-                PirRelationshipType.DECLARES);
+            CreateRelationship(pirPackage, parentNode, pirNode, PirRelationshipType.DECLARES);
         }
     }
 
@@ -246,10 +336,12 @@ public class RoslynToPirMapper
         {
             var parentPirNode = nodeLookup[parentClass];
 
-            CreateRelationship(pirPackage,
+            CreateRelationship(
+                pirPackage,
                 parentPirNode,
                 pirProperty,
-                PirRelationshipType.DECLARES);
+                PirRelationshipType.DECLARES
+            );
         }
     }
 
@@ -281,60 +373,115 @@ public class RoslynToPirMapper
         }
     }
 
+    private PirNode? FindPirNode(ISymbol? symbol)
+    {
+        if (symbol is null)
+        {
+            return null;
+        }
+
+        string? symbolId = symbol.GetDocumentationCommentId();
+
+        if (symbolId is null)
+        {
+            return null;
+        }
+
+        symbolLookup.TryGetValue(symbolId, out PirNode? pirNode);
+
+        return pirNode;
+    }
+
+    private void MapInterface(InterfaceDeclarationSyntax interfaceNode ,  PirPackage pirPackage){
+        PirNode pirInterface = CreateNode(
+            pirPackage,
+            interfaceNode,
+            PirNodeType.Interface,
+            interfaceNode.Identifier.Text
+        );
+
+        INamedTypeSymbol? interfaceSymbol = semanticModel?.GetDeclaredSymbol(interfaceNode);
+
+        string? symbolId = interfaceSymbol?.GetDocumentationCommentId();
+
+        if (symbolId is not null)
+        {
+            symbolLookup[symbolId] = pirInterface;
+        }
+
+        SyntaxNode? parent = interfaceNode.Parent;
+
+        if (parent is FileScopedNamespaceDeclarationSyntax parentNamespace)
+        {
+            var parentPirNode = nodeLookup[parentNamespace];
+
+            CreateRelationship(pirPackage, parentPirNode, pirInterface, PirRelationshipType.CONTAINS);
+        }
+    }
+
     private void MapInvocation(InvocationExpressionSyntax invocationNode, PirPackage pirPackage)
     {
         MethodDeclarationSyntax? callerMethod =
             invocationNode.FirstAncestorOrSelf<MethodDeclarationSyntax>();
 
-        if (callerMethod is null) return;
+        if (callerMethod is null)
+            return;
 
-        IMethodSymbol? callerSymbol =
-            semanticModel?.GetDeclaredSymbol(callerMethod);
+        IMethodSymbol? callerSymbol = semanticModel?.GetDeclaredSymbol(callerMethod);
 
-        string? callerId =
-            callerSymbol?.GetDocumentationCommentId();
-
-        Console.WriteLine($"Caller: {callerId}");    
+        PirNode? callerNode = FindPirNode(callerSymbol);
 
         IMethodSymbol? calledMethodSymbol =
-            semanticModel?
-                .GetSymbolInfo(invocationNode)
-                .Symbol as IMethodSymbol;
+            semanticModel?.GetSymbolInfo(invocationNode).Symbol as IMethodSymbol;
 
-        string? calledId =
-            calledMethodSymbol?.GetDocumentationCommentId();
-        Console.WriteLine(symbolLookup.ContainsKey(callerId!));
-        Console.WriteLine(symbolLookup.ContainsKey(calledId!));
-        
-        if (
-            callerId is not null &&
-            calledId is not null &&
-            symbolLookup.TryGetValue(callerId, out PirNode? callerPir) &&
-            symbolLookup.TryGetValue(calledId, out PirNode? calledPir)
-        )
-        {
-            CreateRelationship(
-                pirPackage,
-                callerPir,
-                calledPir,
-                PirRelationshipType.CALLS
-            );
-        }
+        PirNode? calledNode = FindPirNode(calledMethodSymbol);
 
-        if (calledMethodSymbol is null)
+        if (callerNode is not null && calledNode is not null)
         {
-            Console.WriteLine("Could not resolve invocation.");
-        }
-        else
-        {
-            Console.WriteLine(
-                $"{calledMethodSymbol.ContainingType.Name}.{calledMethodSymbol.Name}"
-            );
+            CreateRelationship(pirPackage, callerNode, calledNode, PirRelationshipType.CALLS);
         }
     }
-    
 
+    private void MapInheritance(ClassDeclarationSyntax classNode, PirPackage pirPackage)
+    {
+        INamedTypeSymbol? classSymbol = semanticModel?.GetDeclaredSymbol(classNode);
 
+        if (classSymbol is null)
+        {
+            return;
+        }
 
+        INamedTypeSymbol? baseType = classSymbol.BaseType;
 
+        PirNode? childNode = FindPirNode(classSymbol);
+
+        PirNode? parentNode = FindPirNode(baseType);
+
+        if (childNode is not null && parentNode is not null)
+        {
+            CreateRelationship(pirPackage, childNode, parentNode, PirRelationshipType.INHERITS);
+        }
+    }
+
+    private void MapImplements(ClassDeclarationSyntax classNode,PirPackage pirPackage)
+    {
+        INamedTypeSymbol? classSymbol = semanticModel?.GetDeclaredSymbol(classNode);
+
+        if (classSymbol is null)
+        {
+            return;
+        }
+
+        PirNode? childNode = FindPirNode(classSymbol);
+
+        foreach (INamedTypeSymbol interfaceSymbol in classSymbol.AllInterfaces)
+        {
+            PirNode? parentNode = FindPirNode(interfaceSymbol);
+
+            if (childNode is not null && parentNode is not null)
+            {
+                CreateRelationship(pirPackage, childNode, parentNode, PirRelationshipType.IMPLEMENTS);
+            }
+        }
+    }
 }

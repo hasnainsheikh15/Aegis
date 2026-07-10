@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj": {}
+    "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj": {}
   },
   "projects": {
-    "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj": {
+    "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+        "projectUniqueName": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
         "projectName": "RoslynWorker",
-        "projectPath": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+        "projectPath": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
         "packagesPath": "C:\\Users\\mdhas\\.nuget\\packages\\",
-        "outputPath": "d:\\Aegis\\apps\\roslyn-worker\\obj\\",
+        "outputPath": "D:\\Aegis\\apps\\roslyn-worker\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

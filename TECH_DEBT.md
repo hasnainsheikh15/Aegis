@@ -1,55 +1,86 @@
 # Technical Debt
 
-## Monorepo
-
-- Replace relative imports with workspace packages.
-- Configure package exports.
-- Create tsconfig.base.json.
-- Configure Turbo build pipeline.
-- Enable auto-imports across packages.
-
-Priority: Medium
-
-
-# Technical Debt
-
-This document tracks architectural improvements that have been intentionally postponed. These are **not bugs** or **planned features**; they are improvements that will make the codebase cleaner, safer, or more maintainable.
+This document tracks architectural improvements that have been intentionally postponed. These are **not bugs** or **planned features**. They are improvements that will make the codebase cleaner, more maintainable, or easier to extend as Aegis grows.
 
 ---
 
-## 1. Extract Relationship Creation Helper
+# Architecture
 
-**Current State**
+## 1. Replace Relative Imports with Workspace Packages
 
-Relationship creation logic is duplicated across multiple mapping methods.
+### Current
 
-Examples:
+Some packages still reference each other using relative imports.
 
-* `MapClass()`
-* `MapMethod()`
-* `MapConstructor()`
-* `MapParameter()`
-* `MapProperty()`
-* `MapField()`
+### Future
 
-**Planned Improvement**
+* Replace relative imports with workspace packages.
+* Configure package exports.
+* Create `tsconfig.base.json`.
+* Configure the Turbo build pipeline.
+* Enable auto-imports across packages.
 
-Introduce:
+**Priority:** Medium
+
+---
+
+## 2. Refactor `RoslynToPirMapper` API
+
+### Current
+
+Each source file creates its own temporary `PirPackage`.
 
 ```csharp
-CreateRelationship(
-    PirPackage pirPackage,
-    PirNode source,
-    PirNode target,
-    PirRelationshipType type
+MapCompilationUnit(...) -> PirPackage
+```
+
+The Roslyn worker later merges these temporary packages into a single project package.
+
+### Future
+
+Refactor the mapper so it writes directly into the project's shared `PirPackage`.
+
+```csharp
+MapCompilationUnit(
+    CompilationUnitSyntax root,
+    SemanticModel semanticModel,
+    PirPackage pirPackage
 )
 ```
 
-to eliminate duplication.
+Benefits:
+
+* Eliminates temporary allocations.
+* Simplifies project-level mapping.
+* Better reflects the fact that a project produces one PIR graph.
 
 ---
 
-## 2. Improve Parent Resolution
+## 3. Introduce `MappingContext`
+
+### Current
+
+`RoslynToPirMapper` stores mapping state in several private fields:
+
+* `SemanticModel`
+* `nodeLookup`
+* `symbolLookup`
+
+### Future
+
+If additional mapper state is introduced (diagnostics, options, type lookups, etc.), replace these individual fields with a dedicated `MappingContext` object.
+
+Benefits:
+
+* Cleaner mapper implementation.
+* Easier unit testing.
+* Reduces shared mutable state.
+
+---
+
+## 4. Improve Parent Resolution
+
+### Current
 
 Many mapping methods manually locate semantic owners.
 
@@ -61,46 +92,102 @@ Examples:
 * Property → Class
 * Parameter → Method / Constructor
 
-Later, investigate whether this can be generalized into reusable helper methods.
+### Future
+
+Investigate reusable helper methods for locating semantic parents to reduce duplicated traversal logic.
 
 ---
 
-## 3. Move PIR Printing into a Dedicated Printer
+## 5. Extract Relationship Creation Helper
 
-`Program.cs` currently handles:
+### Current
 
-* reading files
-* parsing
-* mapping
-* printing
+Relationship creation logic is duplicated across multiple mapping methods.
 
-Printing should eventually move into a dedicated `PirPrinter` class.
+Examples:
 
----
+* `MapClass()`
+* `MapMethod()`
+* `MapConstructor()`
+* `MapParameter()`
+* `MapProperty()`
+* `MapField()`
+* Future semantic mapping methods
 
-## 4. Introduce SemanticModel
+### Future
 
-Current implementation relies only on Roslyn's syntax tree.
+Introduce a reusable helper:
 
-Future work:
-
-* symbol resolution
-* fully-qualified type names
-* inheritance resolution
-* interface resolution
-* accurate method call resolution
-
-This is a major milestone and should be introduced after the structural PIR is stable.
-
----
-
-## 5. Replace Metadata Types with Type Nodes (Future)
-
-Currently, data types are stored as metadata on `PirNode`.
-
-Future possibility:
-
+```csharp
+CreateRelationship(
+    PirPackage pirPackage,
+    PirNode source,
+    PirNode target,
+    PirRelationshipType type
+)
 ```
+
+Benefits:
+
+* Eliminates duplication.
+* Centralizes relationship creation.
+* Makes future semantic mappings simpler.
+
+---
+
+# Roslyn Integration
+
+## 6. Load Projects Through MSBuild
+
+### Current
+
+The Roslyn worker manually creates a `CSharpCompilation` and manually supplies metadata references.
+
+```csharp
+typeof(object)
+
+typeof(Console)
+```
+
+This works for sample projects but does not fully reproduce how real C# projects are compiled.
+
+### Future
+
+Replace manual compilation with `MSBuildWorkspace`.
+
+Benefits:
+
+* Correct project references.
+* NuGet package resolution.
+* Implicit/global usings.
+* Nullable context.
+* Language version.
+* Analyzer support.
+* Compilation options.
+
+This will allow Aegis to analyze projects exactly as Visual Studio does.
+
+---
+
+# PIR Evolution
+
+## 7. Replace Metadata Types with Type Nodes
+
+### Current
+
+Data types are stored as metadata.
+
+Example:
+
+```text
+ReturnType = "User"
+```
+
+### Future
+
+Represent types as graph nodes.
+
+```text
 Method
     │
 RETURNS
@@ -108,44 +195,87 @@ RETURNS
 Type(User)
 ```
 
-instead of:
+Benefits:
 
+* Richer type graph.
+* Easier dependency analysis.
+* Better cross-language representation.
+
+---
+
+## 8. Formalize PIR Specification
+
+Create:
+
+```text
+docs/pir-spec.md
 ```
-ReturnType = "User"
+
+The specification should define:
+
+### Node Types
+
+* Namespace
+* Class
+* Constructor
+* Method
+* Parameter
+* Property
+* Field
+* (Future) Type
+
+### Relationship Types
+
+* CONTAINS
+* DECLARES
+* CALLS
+* INHERITS
+* IMPLEMENTS
+* CREATES
+* READS
+* WRITES
+
+This document will become the contract between every language frontend and the Aegis analysis engine.
+
+---
+
+# Future Decisions
+
+## 9. Relationship Deduplication Strategy
+
+Decide how repeated semantic relationships should be represented.
+
+Example:
+
+```csharp
+Validate();
+Validate();
 ```
 
-This requires semantic analysis and symbol resolution.
+Should this produce:
 
-## Refactor RoslynToPirMapper API
+```text
+Login
+    │
+ CALLS
+    ▼
+Validate
 
-Current API:
+Login
+    │
+ CALLS
+    ▼
+Validate
+```
 
-MapCompilationUnit(...) -> PirPackage
+or
 
-Current project flow creates one temporary PirPackage per file and merges them into a project package.
+```text
+Login
+    │
+ CALLS (count = 2)
+    ▼
+Validate
+```
 
-Future API:
-
-MapCompilationUnit(
-    CompilationUnitSyntax root,
-    SemanticModel semanticModel,
-    PirPackage pirPackage
-)
-
-This will allow the mapper to write directly into the shared project PIR and avoid temporary allocations.
-
-## ---- 
-
-Right now we're manually specifying:
-
-typeof(object)
-
-typeof(Console)
-
-Later, when Aegis analyzes real .csproj projects, we shouldn't guess the references.
-
-Instead, we should load the project through MSBuild (via Microsoft.Build.Locator and MSBuildWorkspace in Roslyn), which automatically provides all the correct references, compilation options, analyzers, and project settings.
-
-That will let Aegis analyze projects the same way Visual Studio does.
-
-For now, our manual references are perfectly fine for learning and for simple sample projects, but it's worth capturing that future improvement in TECH_DEBT.md so we remember to revisit it.
+Current behavior is intentionally undefined and should be decided before large-scale graph analysis is implemented.

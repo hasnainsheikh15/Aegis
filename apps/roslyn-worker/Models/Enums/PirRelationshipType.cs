@@ -4,6 +4,8 @@ public enum PirRelationshipType
 {
     CONTAINS,
     DECLARES,
-    CALLS
+    CALLS,
+    INHERITS,
+    IMPLEMENTS
 }
 

@@ -8,6 +8,7 @@ public enum PirNodeType
     Constructor,
     Parameter,
     Property,
-    Field
+    Field,
+    Interface,
 }
 

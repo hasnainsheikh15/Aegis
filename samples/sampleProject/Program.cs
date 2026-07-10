@@ -1,20 +1,19 @@
-using System;
-
 namespace Demo;
 
-public class User
+public interface IAnimal
 {
-    // public static void main (String [] args) {}
+    void Speak();
+}
 
-    public void Login(string email)
+public class Dog : IAnimal
+{
+    public void Speak()
     {
-        Validate();
-
-        Console.WriteLine(email);
     }
+}
 
-    private void Validate()
-    {
+public class GermanShephard : Dog {
+    public void Bark(){
         
     }
 }
