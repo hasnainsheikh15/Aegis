@@ -1,4 +1,4 @@
-namespace  RoslynWorker.Models.Enums;
+namespace RoslynWorker.Models.Enums;
 
 public enum PirRelationshipType
 {
@@ -6,6 +6,8 @@ public enum PirRelationshipType
     DECLARES,
     CALLS,
     INHERITS,
-    IMPLEMENTS
+    IMPLEMENTS,
+    CREATES,
+    READS,
+    WRITES,
 }
-

@@ -1,19 +1,13 @@
-namespace Demo;
-
-public interface IAnimal
+public class User
 {
-    void Speak();
-}
+    private int count = 0;
 
-public class Dog : IAnimal
-{
-    public void Speak()
+    public void Test()
     {
-    }
-}
+        count++;
+        ++count;
 
-public class GermanShephard : Dog {
-    public void Bark(){
-        
+        count--;
+        --count;
     }
 }
