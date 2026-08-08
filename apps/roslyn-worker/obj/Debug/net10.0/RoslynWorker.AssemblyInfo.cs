@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RoslynWorker")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d4ad37be90acfcf57fe5ca00f7a085a9ae4b4bb8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+08d7917cf6273083907c1d3d6db274034fa876d2")]
 [assembly: System.Reflection.AssemblyProductAttribute("RoslynWorker")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RoslynWorker")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

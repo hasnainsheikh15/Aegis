@@ -12,6 +12,8 @@ public class RoslynToPirMapper
 
     private readonly Dictionary<string, PirNode> symbolLookup = [];
 
+    private readonly HashSet<string> relationshipLookup = [];
+
     private SemanticModel? semanticModel;
 
     public PirPackage MapCompilationUnit(SyntaxNode root, SemanticModel semanticModel)
@@ -210,6 +212,10 @@ public class RoslynToPirMapper
         PirRelationshipType type
     )
     {
+        string relationshipId = $"{source.Id}|{type}|{target.Id}";
+
+        if(!relationshipLookup.Add(relationshipId)) return;
+
         pirPackage.Relationships.Add(
             new PirRelationship
             {

@@ -1,13 +1,10 @@
 public class User
 {
-    private int count = 0;
+    private int count;
 
     public void Test()
     {
         count++;
         ++count;
-
-        count--;
-        --count;
     }
 }
