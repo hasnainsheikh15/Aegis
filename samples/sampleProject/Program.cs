@@ -1,10 +1,21 @@
-public class User
+public class AuthService
 {
-    private int count;
-
-    public void Test()
+    public void Login()
     {
-        count++;
-        ++count;
+        Authenticate();
+        LoadUser();
+    }
+
+    public void Authenticate()
+    {
+        Validate();
+    }
+
+    public void Validate()
+    {
+    }
+
+    public void LoadUser()
+    {
     }
 }

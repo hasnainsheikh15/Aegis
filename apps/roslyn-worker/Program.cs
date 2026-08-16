@@ -1,10 +1,10 @@
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynWorker.Mappers;
 using RoslynWorker.Models;
+using RoslynWorker.Models.Enums;
 using RoslynWorker.Printers;
-
 
 // static void PrintTree(SyntaxNode node, string indent = "")
 // {
@@ -91,9 +91,6 @@ using RoslynWorker.Printers;
 
 // PirPrinter.Print(pirPackage);
 
-
-
-
 if (args.Length == 0)
 {
     Console.WriteLine("Usage: RoslynWorker <project-folder>");
@@ -108,11 +105,7 @@ if (!Directory.Exists(projectPath))
     return;
 }
 
-string[] files = Directory.GetFiles(
-    projectPath,
-    "*.cs",
-    SearchOption.AllDirectories
-);
+string[] files = Directory.GetFiles(projectPath, "*.cs", SearchOption.AllDirectories);
 
 List<SyntaxTree> syntaxTrees = [];
 
@@ -120,10 +113,7 @@ foreach (string file in files)
 {
     string sourceCode = File.ReadAllText(file);
 
-    SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(
-        sourceCode,
-        path: file
-    );
+    SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(sourceCode, path: file);
 
     syntaxTrees.Add(syntaxTree);
 }
@@ -131,13 +121,13 @@ foreach (string file in files)
 MetadataReference[] references =
 [
     MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)
+    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
 ];
 
 var compilation = CSharpCompilation.Create(
     assemblyName: "AegisAnalysis",
     syntaxTrees: syntaxTrees,
-    references : references
+    references: references
 );
 
 // foreach (Diagnostic diagnostic in compilation.GetDiagnostics())
@@ -151,14 +141,11 @@ PirPackage pirPackage = new();
 
 foreach (SyntaxTree syntaxTree in syntaxTrees)
 {
-    CompilationUnitSyntax root =
-        syntaxTree.GetCompilationUnitRoot();
+    CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
-    SemanticModel semanticModel =
-        compilation.GetSemanticModel(syntaxTree);
+    SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-    PirPackage filePackage =
-        mapper.MapCompilationUnit(root, semanticModel);
+    PirPackage filePackage = mapper.MapCompilationUnit(root, semanticModel);
 
     pirPackage.Nodes.AddRange(filePackage.Nodes);
 
@@ -166,3 +153,119 @@ foreach (SyntaxTree syntaxTree in syntaxTrees)
 }
 
 PirPrinter.Print(pirPackage);
+
+PirGraph graph = new(pirPackage);
+
+// PirNode? loginNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Method && node.Name == "Login"
+// );
+
+// if (loginNode is not null)
+// {
+//     foreach (PirNode callee in graph.GetCallees(loginNode))
+//     {
+//         Console.WriteLine($"Callee: {callee.Name}");
+//     }
+// }
+
+// PirNode? validateNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Method && node.Name == "Validate"
+// );
+
+// if (validateNode is not null)
+// {
+//     foreach (PirNode caller in graph.GetCallers(validateNode))
+//     {
+//         Console.WriteLine($"Caller: {caller.Name}");
+//     }
+// }
+
+// PirNode? nameNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Field && node.Name == "name"
+// );
+
+// PirNode? updateNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Method && node.Name == "Update"
+// );
+
+// PirNode? printNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Method && node.Name == "Print"
+// );
+
+// if (nameNode is not null)
+// {
+//     foreach (PirNode reader in graph.GetReaders(nameNode))
+//     {
+//         Console.WriteLine($"Reader: {reader.Name}");
+//     }
+
+//     foreach (PirNode writer in graph.GetWriters(nameNode))
+//     {
+//         Console.WriteLine($"Writer: {writer.Name}");
+//     }
+// }
+
+GraphAnalyzer analyzer = new(graph);
+
+PirNode? loginNode = pirPackage.Nodes.FirstOrDefault(node =>
+    node.Type == PirNodeType.Method && node.Name == "Login"
+);
+
+// if (loginNode is not null)
+// {
+//     foreach (PirNode method in analyzer.GetReachableMethods(loginNode))
+//     {
+//         Console.WriteLine($"Reachable: {method.Name}");
+//     }
+// }
+
+DependencyOptions options = new()
+{
+    RelationshipTypes =
+    [
+        PirRelationshipType.CALLS,
+        PirRelationshipType.READS,
+        PirRelationshipType.WRITES,
+        PirRelationshipType.CREATES,
+    ],
+};
+
+if (loginNode is not null)
+{
+    foreach (List<DependencyPathStep> path in analyzer.GetDependencyPaths(loginNode, options))
+    {
+        Console.WriteLine("PATH:");
+
+        foreach (DependencyPathStep step in path)
+        {
+            Console.WriteLine(
+                $"{step.Source.Name} --{step.RelationshipType}--> {step.Target.Name}"
+            );
+        }
+    }
+}
+
+// PirNode? validateNode = pirPackage.Nodes.FirstOrDefault(node =>
+//     node.Type == PirNodeType.Method && node.Name == "Validate"
+// );
+
+// if (validateNode is not null)
+// {
+//     foreach (PirNode method in analyzer.GetImpactedMethods(validateNode))
+//     {
+//         Console.WriteLine($"Impacted: {method.Name}");
+//     }
+// }
+
+// PirNode? dNode = pirPackage.Nodes
+//     .FirstOrDefault(node =>
+//         node.Type == PirNodeType.Method &&
+//         node.Name == "D");
+
+// if (dNode is not null)
+// {
+//     foreach (PirNode method in analyzer.GetImpactedMethods(dNode))
+//     {
+//         Console.WriteLine($"Impacted: {method.Name}");
+//     }
+// }
