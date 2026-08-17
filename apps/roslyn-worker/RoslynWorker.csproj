@@ -16,5 +16,13 @@
     />
     <Compile Include="../../packages/graph/DependencyPathStep.cs"
          Link="Graph/DependencyPathStep.cs" />
+         <Compile Include="../../packages/graph/ProgramSlice.cs"
+         Link="Graph/ProgramSlice.cs" />
+         <Compile Include="../../packages/graph/SensitivityAnalyzer.cs"
+         Link="Graph/SensitivityAnalyzer.cs" />
+         <Compile Include="../../packages/graph/SensitivityResult.cs"
+         Link="Graph/SensitivityResult.cs" />
+         <Compile Include="../../packages/graph/SensitivityLevel.cs"
+         Link="Graph/SensitivityLevel.cs" />
   </ItemGroup>
 </Project>

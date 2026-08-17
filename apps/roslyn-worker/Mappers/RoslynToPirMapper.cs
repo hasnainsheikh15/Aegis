@@ -191,12 +191,18 @@ public class RoslynToPirMapper
         string? dataType = null
     )
     {
+        ISymbol? symbol = semanticModel?.GetDeclaredSymbol(syntaxNode);
+
         PirNode pirNode = new()
         {
             Id = Guid.NewGuid().ToString(),
             Type = type,
             Name = name,
             DataType = dataType,
+            Accessibility = MapAccessibility(symbol),
+            Modifiers = MapModifiers(symbol),
+            HasInitializer = HasInitializer(syntaxNode),
+            InitializerKind = MapInitializerKind(syntaxNode),
         };
 
         pirPackage.Nodes.Add(pirNode);
@@ -214,7 +220,8 @@ public class RoslynToPirMapper
     {
         string relationshipId = $"{source.Id}|{type}|{target.Id}";
 
-        if(!relationshipLookup.Add(relationshipId)) return;
+        if (!relationshipLookup.Add(relationshipId))
+            return;
 
         pirPackage.Relationships.Add(
             new PirRelationship
@@ -735,5 +742,121 @@ public class RoslynToPirMapper
         CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.READS);
 
         CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.WRITES);
+    }
+
+    private PirAccessibility MapAccessibility(ISymbol? symbol)
+    {
+        if (symbol is null)
+            return PirAccessibility.Unknown;
+
+        return symbol.DeclaredAccessibility switch
+        {
+            Accessibility.Private => PirAccessibility.Private,
+            Accessibility.Protected => PirAccessibility.Protected,
+            Accessibility.Internal => PirAccessibility.Internal,
+            Accessibility.Public => PirAccessibility.Public,
+            _ => PirAccessibility.Unknown,
+        };
+    }
+
+    private PirModifier MapModifiers(ISymbol? symbol)
+    {
+        if (symbol is null)
+        {
+            return PirModifier.None;
+        }
+
+        PirModifier modifiers = PirModifier.None;
+
+        if (symbol.IsStatic)
+        {
+            modifiers |= PirModifier.Static;
+        }
+
+        if (symbol.IsAbstract)
+        {
+            modifiers |= PirModifier.Abstract;
+        }
+
+        if (symbol.IsVirtual)
+        {
+            modifiers |= PirModifier.Virtual;
+        }
+
+        if (symbol.IsOverride)
+        {
+            modifiers |= PirModifier.Override;
+        }
+
+        if (symbol.IsSealed)
+        {
+            modifiers |= PirModifier.Sealed;
+        }
+
+        if (symbol is IFieldSymbol field)
+        {
+            if (field.IsConst)
+            {
+                modifiers |= PirModifier.Const;
+            }
+
+            if (field.IsReadOnly)
+            {
+                modifiers |= PirModifier.Readonly;
+            }
+        }
+
+        if (symbol is IMethodSymbol method && method.IsAsync)
+        {
+            modifiers |= PirModifier.Async;
+        }
+
+        return modifiers;
+    }
+
+    private bool HasInitializer(SyntaxNode syntaxNode)
+    {
+        return syntaxNode is VariableDeclaratorSyntax variable && variable.Initializer is not null;
+    }
+
+    private PirInitializerKind MapInitializerKind(SyntaxNode syntaxNode)
+    {
+        if (syntaxNode is VariableDeclaratorSyntax variable)
+        {
+            EqualsValueClauseSyntax? initializer = variable.Initializer;
+
+            if (initializer is null)
+            {
+                return PirInitializerKind.None;
+            }
+
+            return initializer.Value switch
+            {
+                LiteralExpressionSyntax literal
+                    when literal.IsKind(SyntaxKind.StringLiteralExpression) =>
+                    PirInitializerKind.StringLiteral,
+
+                LiteralExpressionSyntax literal
+                    when literal.IsKind(SyntaxKind.NumericLiteralExpression) =>
+                    PirInitializerKind.NumericLiteral,
+
+                LiteralExpressionSyntax literal
+                    when literal.IsKind(SyntaxKind.TrueLiteralExpression)
+                        || literal.IsKind(SyntaxKind.FalseLiteralExpression) =>
+                    PirInitializerKind.BooleanLiteral,
+
+                LiteralExpressionSyntax literal
+                    when literal.IsKind(SyntaxKind.NullLiteralExpression) =>
+                    PirInitializerKind.NullLiteral,
+
+                ObjectCreationExpressionSyntax => PirInitializerKind.ObjectCreation,
+
+                InvocationExpressionSyntax => PirInitializerKind.MethodCall,
+
+                _ => PirInitializerKind.Other,
+            };
+        }
+
+        return PirInitializerKind.None;
     }
 }

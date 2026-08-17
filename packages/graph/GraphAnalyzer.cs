@@ -95,44 +95,90 @@ public sealed class GraphAnalyzer
             .Where(step => step is not null)!;
     }
 
-    public IEnumerable<List<DependencyPathStep>> GetDependencyPaths(PirNode start , DependencyOptions options) {
+    public IEnumerable<List<DependencyPathStep>> GetDependencyPaths(
+        PirNode start,
+        DependencyOptions options
+    )
+    {
         HashSet<string> visited = [start.Id];
 
         List<List<DependencyPathStep>> paths = [];
 
-        DFSPaths(start,options,visited,[],paths);
+        DFSPaths(start, options, visited, [], paths);
 
         return paths;
     }
 
     private void DFSPaths(
-    PirNode node,
-    DependencyOptions options,
-    HashSet<string> visited,
-    List<DependencyPathStep> currentPath,
-    List<List<DependencyPathStep>> paths)
-{
-    foreach (DependencyPathStep step in GetDependencySteps(node, options))
+        PirNode node,
+        DependencyOptions options,
+        HashSet<string> visited,
+        List<DependencyPathStep> currentPath,
+        List<List<DependencyPathStep>> paths
+    )
     {
-        if (!visited.Add(step.Target.Id))
+        foreach (DependencyPathStep step in GetDependencySteps(node, options))
         {
-            continue;
+            if (!visited.Add(step.Target.Id))
+            {
+                continue;
+            }
+
+            currentPath.Add(step);
+
+            paths.Add(new List<DependencyPathStep>(currentPath));
+
+            DFSPaths(step.Target, options, visited, currentPath, paths);
+
+            currentPath.RemoveAt(currentPath.Count - 1);
+            visited.Remove(step.Target.Id);
         }
-
-        currentPath.Add(step);
-
-        paths.Add(new List<DependencyPathStep>(currentPath));
-
-        DFSPaths(
-            step.Target,
-            options,
-            visited,
-            currentPath,
-            paths
-        );
-
-        currentPath.RemoveAt(currentPath.Count - 1);
-        visited.Remove(step.Target.Id);
     }
-}
+
+    public ProgramSlice BuildDependencySlice(PirNode start, DependencyOptions options)
+    {
+        ProgramSlice slice = new();
+
+        HashSet<string> visited = [start.Id];
+
+        slice.Nodes.Add(start);
+
+        BuildSliceDFS(start, options, visited, slice);
+
+        return slice;
+    }
+
+    private void BuildSliceDFS(
+        PirNode node,
+        DependencyOptions options,
+        HashSet<string> visited,
+        ProgramSlice slice
+    )
+    {
+        foreach (PirRelationship relationship in graph.GetOutgoingRelationships(node))
+        {
+            if (!options.RelationshipTypes.Contains(relationship.Type))
+            {
+                continue;
+            }
+
+            PirNode? target = graph.GetNode(relationship.TargetId);
+
+            if (target is null)
+            {
+                continue;
+            }
+
+            slice.Relationships.Add(relationship);
+
+            if (!visited.Add(target.Id))
+            {
+                continue;
+            }
+
+            slice.Nodes.Add(target);
+
+            BuildSliceDFS(target, options, visited, slice);
+        }
+    }
 }
