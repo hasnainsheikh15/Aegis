@@ -1,0 +1,16 @@
+D:\Aegis\packages\sanitizer\bin\Debug\net10.0\Sanitizer.deps.json
+D:\Aegis\packages\sanitizer\bin\Debug\net10.0\Sanitizer.dll
+D:\Aegis\packages\sanitizer\bin\Debug\net10.0\Sanitizer.pdb
+D:\Aegis\packages\sanitizer\bin\Debug\net10.0\Pir.dll
+D:\Aegis\packages\sanitizer\bin\Debug\net10.0\Pir.pdb
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.csproj.AssemblyReference.cache
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.GeneratedMSBuildEditorConfig.editorconfig
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.AssemblyInfoInputs.cache
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.AssemblyInfo.cs
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.csproj.CoreCompileInputs.cache
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.sourcelink.json
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.csproj.Up2Date
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.dll
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\refint\Sanitizer.dll
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\Sanitizer.pdb
+D:\Aegis\packages\sanitizer\obj\Debug\net10.0\ref\Sanitizer.dll

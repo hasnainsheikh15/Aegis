@@ -1,3 +1,4 @@
+namespace Aegis.Graph;
 public enum SensitivityLevel
 {
     Public,

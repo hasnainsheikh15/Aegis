@@ -279,3 +279,18 @@ Validate
 ```
 
 Current behavior is intentionally undefined and should be decided before large-scale graph analysis is implemented.
+
+## 10. Unify Roslyn Symbol-to-PIR Node Lookup
+
+### Current
+
+`RoslynToPirMapper` currently maintains separate lookup dictionaries for different symbol categories.
+
+```text
+symbolLookup
+    ↓
+Classes / Methods / Fields / Properties / Parameters
+
+localSymbolLookup
+    ↓
+LocalVariables

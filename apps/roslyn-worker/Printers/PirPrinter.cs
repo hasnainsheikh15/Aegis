@@ -1,4 +1,4 @@
-using RoslynWorker.Models;
+using Aegis.Pir;
 
 namespace RoslynWorker.Printers;
 
@@ -47,9 +47,9 @@ public static class PirPrinter
             PirNode source = nodeLookup[relationship.SourceId];
             PirNode target = nodeLookup[relationship.TargetId];
 
-            // Console.WriteLine(
-            //     $"{source.Type}({source.Name}) --{relationship.Type}--> {target.Type}({target.Name})"
-            // );
+            Console.WriteLine(
+                $"{source.Type}({source.Name}) --{relationship.Type}--> {target.Type}({target.Name})"
+            );
         }
     }
 }

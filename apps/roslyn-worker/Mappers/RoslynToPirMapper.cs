@@ -1,8 +1,8 @@
+using Aegis.Pir;
+using Aegis.Pir.Enums;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using RoslynWorker.Models;
-using RoslynWorker.Models.Enums;
 
 namespace RoslynWorker.Mappers;
 
@@ -13,6 +13,10 @@ public class RoslynToPirMapper
     private readonly Dictionary<string, PirNode> symbolLookup = [];
 
     private readonly HashSet<string> relationshipLookup = [];
+
+    private readonly Dictionary<ISymbol, PirNode> localSymbolLookup = new(
+        SymbolEqualityComparer.Default
+    );
 
     private SemanticModel? semanticModel;
 
@@ -119,6 +123,10 @@ public class RoslynToPirMapper
             MapInterface(interfaceNode, pirPackage);
         }
 
+        if (node is LocalDeclarationStatementSyntax localDeclaration)
+        {
+            MapLocalVariable(localDeclaration, pirPackage);
+        }
         foreach (var child in node.ChildNodes())
         {
             visitDeclaration(child, pirPackage);
@@ -162,10 +170,10 @@ public class RoslynToPirMapper
             MapWrite(assignmentNode, pirPackage);
         }
 
-        // if (node is AssignmentExpressionSyntax assignment)
-        // {
-        //     Console.WriteLine(assignment.Kind());
-        // }
+        if (node is LocalDeclarationStatementSyntax localDeclaration)
+        {
+            MapLocalVariableFlow(localDeclaration, pirPackage);
+        }
 
         if (node is PrefixUnaryExpressionSyntax prefix)
         {
@@ -191,6 +199,10 @@ public class RoslynToPirMapper
         string? dataType = null
     )
     {
+        if (nodeLookup.TryGetValue(syntaxNode, out PirNode? existingNode))
+        {
+            return existingNode;
+        }
         ISymbol? symbol = semanticModel?.GetDeclaredSymbol(syntaxNode);
 
         PirNode pirNode = new()
@@ -653,7 +665,6 @@ public class RoslynToPirMapper
 
     private void MapWrite(AssignmentExpressionSyntax assignmentNode, PirPackage pirPackage)
     {
-        // Find the enclosing method
         PirNode? callerNode = FindEnclosingMethodNode(assignmentNode);
 
         if (callerNode is null)
@@ -661,31 +672,62 @@ public class RoslynToPirMapper
             return;
         }
 
-        // Resolve the symbol being assigned to
-        ISymbol? symbol = semanticModel?.GetSymbolInfo(assignmentNode.Left).Symbol;
+        ISymbol? targetSymbol = semanticModel.GetSymbolInfo(assignmentNode.Left).Symbol;
 
-        if (symbol is not IFieldSymbol && symbol is not IPropertySymbol)
+        if (targetSymbol is null)
         {
             return;
         }
 
-        PirNode? memberNode = FindPirNode(symbol);
-        if (memberNode is null)
-            return;
-
-        bool isCompoundAssignment = assignmentNode.Kind() != SyntaxKind.SimpleAssignmentExpression;
-
-        if (isCompoundAssignment)
+        // Handle field/property writes.
+        if (targetSymbol is IFieldSymbol || targetSymbol is IPropertySymbol)
         {
-            CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.READS);
+            PirNode? memberNode = FindPirNode(targetSymbol);
+
+            if (memberNode is null)
+            {
+                return;
+            }
+
+            bool isCompoundAssignment =
+                assignmentNode.Kind() != SyntaxKind.SimpleAssignmentExpression;
+
+            if (isCompoundAssignment)
+            {
+                CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.READS);
+            }
+
+            CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.WRITES);
         }
 
-        if (memberNode is null)
+        // Data flow
+
+        ISymbol? sourceSymbol = semanticModel.GetSymbolInfo(assignmentNode.Right).Symbol;
+
+        if (sourceSymbol is null)
         {
             return;
         }
 
-        CreateRelationship(pirPackage, callerNode, memberNode, PirRelationshipType.WRITES);
+        PirNode? sourceNode = FindPirNode(sourceSymbol);
+
+        PirNode? targetNode = null;
+
+        if (targetSymbol is ILocalSymbol)
+        {
+            localSymbolLookup.TryGetValue(targetSymbol, out targetNode);
+        }
+        else
+        {
+            targetNode = FindPirNode(targetSymbol);
+        }
+
+        if (sourceNode is null || targetNode is null)
+        {
+            return;
+        }
+
+        CreateRelationship(pirPackage, sourceNode, targetNode, PirRelationshipType.FLOWS_TO);
     }
 
     private PirNode? FindEnclosingMethodNode(SyntaxNode node)
@@ -858,5 +900,77 @@ public class RoslynToPirMapper
         }
 
         return PirInitializerKind.None;
+    }
+
+    private void MapLocalVariable(
+        LocalDeclarationStatementSyntax declaration,
+        PirPackage pirPackage
+    )
+    {
+        foreach (VariableDeclaratorSyntax variable in declaration.Declaration.Variables)
+        {
+            ILocalSymbol? symbol = semanticModel.GetDeclaredSymbol(variable) as ILocalSymbol;
+
+            if (symbol is null)
+            {
+                continue;
+            }
+
+            PirNode node = CreateNode(
+                pirPackage,
+                variable,
+                PirNodeType.LocalVariable,
+                symbol.Name,
+                symbol.Type.ToString()
+            );
+
+            localSymbolLookup[symbol] = node;
+        }
+    }
+
+    private void MapLocalVariableFlow(
+        LocalDeclarationStatementSyntax declaration,
+        PirPackage pirPackage
+    )
+    {
+        foreach (VariableDeclaratorSyntax variable in declaration.Declaration.Variables)
+        {
+            if (variable.Initializer is null)
+            {
+                continue;
+            }
+
+            ISymbol? sourceSymbol = semanticModel.GetSymbolInfo(variable.Initializer.Value).Symbol;
+
+            ISymbol? targetSymbol = semanticModel.GetDeclaredSymbol(variable);
+
+            PirNode? sourceNode = null;
+
+            if (sourceSymbol is ILocalSymbol)
+            {
+                localSymbolLookup.TryGetValue(sourceSymbol, out sourceNode);
+            }
+            else
+            {
+                sourceNode = FindPirNode(sourceSymbol);
+            }
+
+            PirNode? targetNode = null;
+
+            if (targetSymbol is not null)
+            {
+                localSymbolLookup.TryGetValue(targetSymbol, out targetNode);
+            }
+
+            if (sourceNode is null || targetNode is null)
+            {
+                // Console.WriteLine("FLOW NOT CREATED");
+                continue;
+            }
+
+            // Console.WriteLine("FLOW CREATED");
+
+            CreateRelationship(pirPackage, sourceNode, targetNode, PirRelationshipType.FLOWS_TO);
+        }
     }
 }

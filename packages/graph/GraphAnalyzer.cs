@@ -1,5 +1,6 @@
-using RoslynWorker.Models;
-using RoslynWorker.Models.Enums;
+namespace Aegis.Graph;
+using Aegis.Pir;
+using Aegis.Pir.Enums;
 
 public sealed class GraphAnalyzer
 {

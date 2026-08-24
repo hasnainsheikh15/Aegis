@@ -1,21 +1,17 @@
-public class User
+public class AuthService
 {
     private string password = "abc123";
 
-    private string token = GetToken();
-
-    private int count = 10;
-
-    private bool enabled = true;
-
-    private object data = new object();
-
-    private string nothing = null;
-
-    private string noValue;
-    
-    private string GetToken()
+    public void Login()
     {
-        return "token";
+        string token = "";
+
+        token = password;
+
+        string backup = token;
+
+        Validate();
     }
+
+    public void Validate() { }
 }

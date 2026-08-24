@@ -1,0 +1,12 @@
+D:\Aegis\packages\pir\bin\Debug\net10.0\Pir.deps.json
+D:\Aegis\packages\pir\bin\Debug\net10.0\Pir.dll
+D:\Aegis\packages\pir\bin\Debug\net10.0\Pir.pdb
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.GeneratedMSBuildEditorConfig.editorconfig
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.AssemblyInfoInputs.cache
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.AssemblyInfo.cs
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.csproj.CoreCompileInputs.cache
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.sourcelink.json
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.dll
+D:\Aegis\packages\pir\obj\Debug\net10.0\refint\Pir.dll
+D:\Aegis\packages\pir\obj\Debug\net10.0\Pir.pdb
+D:\Aegis\packages\pir\obj\Debug\net10.0\ref\Pir.dll

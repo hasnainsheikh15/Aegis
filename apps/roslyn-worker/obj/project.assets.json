@@ -123,6 +123,29 @@
             "locale": "zh-Hant"
           }
         }
+      },
+      "Graph/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "Pir": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Graph.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Graph.dll": {}
+        }
+      },
+      "Pir/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "compile": {
+          "bin/placeholder/Pir.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Pir.dll": {}
+        }
       }
     }
   },
@@ -381,11 +404,23 @@
         "microsoft.codeanalysis.csharp.5.3.0.nupkg.sha512",
         "microsoft.codeanalysis.csharp.nuspec"
       ]
+    },
+    "Graph/1.0.0": {
+      "type": "project",
+      "path": "../../packages/graph/Graph.csproj",
+      "msbuildProject": "../../packages/graph/Graph.csproj"
+    },
+    "Pir/1.0.0": {
+      "type": "project",
+      "path": "../../packages/pir/Pir.csproj",
+      "msbuildProject": "../../packages/pir/Pir.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
-      "Microsoft.CodeAnalysis.CSharp >= 5.3.0"
+      "Graph >= 1.0.0",
+      "Microsoft.CodeAnalysis.CSharp >= 5.3.0",
+      "Pir >= 1.0.0"
     ]
   },
   "packageFolders": {
@@ -395,11 +430,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+      "projectUniqueName": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
       "projectName": "RoslynWorker",
-      "projectPath": "d:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
+      "projectPath": "D:\\Aegis\\apps\\roslyn-worker\\RoslynWorker.csproj",
       "packagesPath": "C:\\Users\\mdhas\\.nuget\\packages\\",
-      "outputPath": "d:\\Aegis\\apps\\roslyn-worker\\obj\\",
+      "outputPath": "D:\\Aegis\\apps\\roslyn-worker\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -419,7 +454,14 @@
       "frameworks": {
         "net10.0": {
           "targetAlias": "net10.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "D:\\Aegis\\packages\\graph\\Graph.csproj": {
+              "projectPath": "D:\\Aegis\\packages\\graph\\Graph.csproj"
+            },
+            "D:\\Aegis\\packages\\pir\\Pir.csproj": {
+              "projectPath": "D:\\Aegis\\packages\\pir\\Pir.csproj"
+            }
+          }
         }
       },
       "warningProperties": {

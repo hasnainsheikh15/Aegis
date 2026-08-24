@@ -1,0 +1,16 @@
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.GeneratedMSBuildEditorConfig.editorconfig
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.AssemblyInfoInputs.cache
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.AssemblyInfo.cs
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.csproj.CoreCompileInputs.cache
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.sourcelink.json
+D:\Aegis\packages\graph\bin\Debug\net10.0\Graph.deps.json
+D:\Aegis\packages\graph\bin\Debug\net10.0\Graph.dll
+D:\Aegis\packages\graph\bin\Debug\net10.0\Graph.pdb
+D:\Aegis\packages\graph\bin\Debug\net10.0\Pir.dll
+D:\Aegis\packages\graph\bin\Debug\net10.0\Pir.pdb
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.csproj.AssemblyReference.cache
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.csproj.Up2Date
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.dll
+D:\Aegis\packages\graph\obj\Debug\net10.0\refint\Graph.dll
+D:\Aegis\packages\graph\obj\Debug\net10.0\Graph.pdb
+D:\Aegis\packages\graph\obj\Debug\net10.0\ref\Graph.dll

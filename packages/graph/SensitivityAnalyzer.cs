@@ -1,5 +1,6 @@
-using RoslynWorker.Models;
-using RoslynWorker.Models.Enums;
+namespace Aegis.Graph;
+using Aegis.Pir;
+using Aegis.Pir.Enums;
 
 public sealed class SensitivityAnalyzer
 {
@@ -73,6 +74,23 @@ public sealed class SensitivityAnalyzer
             Node = node,
             Level = level,
             Reasons = reasons,
+        };
+    }
+
+    public SliceSensitivityResult AnalyzeSlice(ProgramSlice slice)
+    {
+        List<SensitivityResult> results = [];
+
+        foreach (PirNode node in slice.Nodes)
+        {
+            SensitivityResult result = Analyze(node);
+            results.Add(result);
+        }
+
+        return new SliceSensitivityResult
+        {
+            Slice = slice,
+            Results = results
         };
     }
 }

@@ -8,7 +8,9 @@
     ".NETCoreApp,Version=v10.0": {
       "RoslynWorker/1.0.0": {
         "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "5.3.0"
+          "Graph": "1.0.0",
+          "Microsoft.CodeAnalysis.CSharp": "5.3.0",
+          "Pir": "1.0.0"
         },
         "runtime": {
           "RoslynWorker.dll": {}
@@ -114,6 +116,25 @@
             "locale": "zh-Hant"
           }
         }
+      },
+      "Graph/1.0.0": {
+        "dependencies": {
+          "Pir": "1.0.0"
+        },
+        "runtime": {
+          "Graph.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Pir/1.0.0": {
+        "runtime": {
+          "Pir.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
       }
     }
   },
@@ -136,6 +157,16 @@
       "sha512": "sha512-SQFNGQF4f7UfDXKxMzzGNMr3fjrPDIjLfmRvvVgDCw+dyvEHDaRfHuKA5q0Pr0/JW0Gcw89TxrxrS/MjwBvluQ==",
       "path": "microsoft.codeanalysis.csharp/5.3.0",
       "hashPath": "microsoft.codeanalysis.csharp.5.3.0.nupkg.sha512"
+    },
+    "Graph/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Pir/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
     }
   }
 }

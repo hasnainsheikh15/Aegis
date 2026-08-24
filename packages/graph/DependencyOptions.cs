@@ -1,4 +1,5 @@
-using RoslynWorker.Models.Enums;
+namespace Aegis.Graph;
+using Aegis.Pir.Enums;
 
 public sealed class DependencyOptions
 {

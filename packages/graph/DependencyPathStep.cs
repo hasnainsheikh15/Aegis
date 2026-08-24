@@ -1,5 +1,6 @@
-using RoslynWorker.Models.Enums;
-using RoslynWorker.Models;
+namespace Aegis.Graph;
+using Aegis.Pir.Enums;
+using Aegis.Pir;
 
 public sealed class DependencyPathStep
 {

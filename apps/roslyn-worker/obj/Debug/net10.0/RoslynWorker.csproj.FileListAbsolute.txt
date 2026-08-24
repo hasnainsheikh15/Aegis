@@ -43,3 +43,7 @@ D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\zh-Hans\Microsoft.CodeAnalysis.CSh
 D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\zh-Hant\Microsoft.CodeAnalysis.CSharp.resources.dll
 D:\Aegis\apps\roslyn-worker\obj\Debug\net10.0\RoslynWorker.csproj.AssemblyReference.cache
 D:\Aegis\apps\roslyn-worker\obj\Debug\net10.0\RoslynWo.C62868A8.Up2Date
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Graph.dll
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Pir.dll
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Graph.pdb
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Pir.pdb
