@@ -223,6 +223,21 @@ public class RoslynToPirMapper
         return pirNode;
     }
 
+    public bool TryGetSyntaxNode(PirNode pirNode, out SyntaxNode? syntaxNode)
+    {
+        foreach ((SyntaxNode node, PirNode mappedNode) in nodeLookup)
+        {
+            if (mappedNode.Id == pirNode.Id)
+            {
+                syntaxNode = node;
+                return true;
+            }
+        }
+
+        syntaxNode = null;
+        return false;
+    }
+
     private void CreateRelationship(
         PirPackage pirPackage,
         PirNode source,
@@ -973,4 +988,6 @@ public class RoslynToPirMapper
             CreateRelationship(pirPackage, sourceNode, targetNode, PirRelationshipType.FLOWS_TO);
         }
     }
+
+    
 }

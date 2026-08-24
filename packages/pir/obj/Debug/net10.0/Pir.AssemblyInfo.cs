@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Pir")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+745cba8e8127c1406d505f03cfc5ecbcaa53fcae")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+63c806bff548cd69a7b48e80344a5b6028a1e7c4")]
 [assembly: System.Reflection.AssemblyProductAttribute("Pir")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Pir")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

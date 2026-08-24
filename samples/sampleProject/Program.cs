@@ -4,14 +4,13 @@ public class AuthService
 
     public void Login()
     {
-        string token = "";
-
-        token = password;
-
+        string token = password;
         string backup = token;
 
         Validate();
     }
 
-    public void Validate() { }
+    public void Validate()
+    {
+    }
 }

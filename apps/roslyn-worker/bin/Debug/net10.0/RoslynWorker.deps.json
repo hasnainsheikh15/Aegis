@@ -10,7 +10,8 @@
         "dependencies": {
           "Graph": "1.0.0",
           "Microsoft.CodeAnalysis.CSharp": "5.3.0",
-          "Pir": "1.0.0"
+          "Pir": "1.0.0",
+          "Sanitizer": "1.0.0"
         },
         "runtime": {
           "RoslynWorker.dll": {}
@@ -135,6 +136,17 @@
             "fileVersion": "1.0.0.0"
           }
         }
+      },
+      "Sanitizer/1.0.0": {
+        "dependencies": {
+          "Pir": "1.0.0"
+        },
+        "runtime": {
+          "Sanitizer.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
       }
     }
   },
@@ -164,6 +176,11 @@
       "sha512": ""
     },
     "Pir/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Sanitizer/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

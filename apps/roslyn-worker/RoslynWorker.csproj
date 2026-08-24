@@ -13,5 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\packages\graph\Graph.csproj" />
     <ProjectReference Include="..\..\packages\pir\Pir.csproj" />
+    <ProjectReference Include="..\..\packages\sanitizer\Sanitizer.csproj" />
   </ItemGroup>
 </Project>

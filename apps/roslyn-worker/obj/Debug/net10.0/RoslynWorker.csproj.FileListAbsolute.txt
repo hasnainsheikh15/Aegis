@@ -47,3 +47,5 @@ D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Graph.dll
 D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Pir.dll
 D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Graph.pdb
 D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Pir.pdb
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Sanitizer.dll
+D:\Aegis\apps\roslyn-worker\bin\Debug\net10.0\Sanitizer.pdb
