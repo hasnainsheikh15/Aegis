@@ -66,57 +66,6 @@ foreach (SyntaxTree syntaxTree in syntaxTrees)
 }
 
 PirPrinter.Print(pirPackage);
-PirNode? passwordNode = pirPackage.Nodes.FirstOrDefault(node =>
-    node.Type == PirNodeType.Field && node.Name == "password"
-);
-
-if (
-    passwordNode is not null
-    && mapper.TryGetSyntaxNode(passwordNode, out SyntaxNode? syntaxNode)
-    && syntaxNode is VariableDeclaratorSyntax variableNode
-    && variableNode.Initializer is not null
-)
-{
-    ExpressionSyntax initializer = variableNode.Initializer.Value;
-
-    SanitizationTarget target = new()
-    {
-        NodeId = passwordNode.Id,
-        NodeType = passwordNode.Type,
-        FilePath = syntaxNode.SyntaxTree.FilePath,
-        Start = initializer.Span.Start,
-        Length = initializer.Span.Length,
-        OriginalText = initializer.ToFullString(),
-    };
-
-    Console.WriteLine("\nSANITIZATION TARGET");
-
-    Console.WriteLine($"Node ID: {target.NodeId}");
-    Console.WriteLine($"Node Type: {target.NodeType}");
-    Console.WriteLine($"File: {target.FilePath}");
-    Console.WriteLine($"Start: {target.Start}");
-    Console.WriteLine($"Length: {target.Length}");
-    Console.WriteLine($"Original: {target.OriginalText}");
-
-    SourceSanitizer sourceSanitizer = new();
-
-    string dummyText = new DummyValueGenerator().Generate(target.OriginalText, passwordNode.Name);
-
-    SanitizationMapping mapping = sourceSanitizer.Sanitize(
-        sourceCode: File.ReadAllText(target.FilePath),
-        target: target,
-        dummyText: dummyText,
-        sanitizedSource: out string sanitizedSource
-    );
-
-    Console.WriteLine("\nSANITIZED SOURCE");
-    Console.WriteLine(sanitizedSource);
-
-    Console.WriteLine("\nSANITIZATION MAPPING");
-    Console.WriteLine($"Node ID: {mapping.NodeId}");
-    Console.WriteLine($"Original: {mapping.OriginalText}");
-    Console.WriteLine($"Dummy: {mapping.DummyText}");
-}
 
 PirGraph graph = new(pirPackage);
 
@@ -138,37 +87,111 @@ PirNode? loginNode = pirPackage.Nodes.FirstOrDefault(node =>
     node.Type == PirNodeType.Method && node.Name == "Login"
 );
 
-// if (loginNode is not null)
-// {
-//     ProgramSlice slice = graphAnalyzer.BuildDependencySlice(loginNode, options);
+if (loginNode is not null)
+{
+    ProgramSlice slice =
+        graphAnalyzer.BuildDependencySlice(loginNode, options);
 
-//     SensitivityAnalyzer sensitivityAnalyzer = new();
+    SensitivityAnalyzer sensitivityAnalyzer = new();
 
-//     SliceSensitivityResult analysis = sensitivityAnalyzer.AnalyzeSlice(slice);
+    SliceSensitivityResult analysis =
+        sensitivityAnalyzer.AnalyzeSlice(slice);
 
-//     SensitivityPropagator propagator = new(graph, pirPackage);
+    SensitivityPropagator propagator =
+        new(graph, pirPackage);
 
-//     Dictionary<string, SensitivityLevel> propagated = propagator.Propagate(analysis.Results);
+    Dictionary<string, SensitivityLevel> propagated =
+        propagator.Propagate(analysis.Results);
 
-//     Console.WriteLine("\nSENSITIVITY ANALYSIS");
+    Console.WriteLine("\nSENSITIVITY ANALYSIS");
 
-//     foreach (SensitivityResult result in analysis.Results)
-//     {
-//         Console.WriteLine($"{result.Node.Type} : " + $"{result.Node.Name} → " + $"{result.Level}");
+    foreach (SensitivityResult result in analysis.Results)
+    {
+        Console.WriteLine(
+            $"{result.Node.Type} : " +
+            $"{result.Node.Name} → " +
+            $"{result.Level}"
+        );
 
-//         foreach (string reason in result.Reasons)
-//         {
-//             Console.WriteLine($"  Reason: {reason}");
-//         }
-//     }
+        foreach (string reason in result.Reasons)
+        {
+            Console.WriteLine($"  Reason: {reason}");
+        }
+    }
 
-//     Console.WriteLine("\nPROPAGATED SENSITIVITY");
+    Console.WriteLine("\nPROPAGATED SENSITIVITY");
 
-//     foreach (PirNode node in pirPackage.Nodes)
-//     {
-//         if (propagated.TryGetValue(node.Id, out SensitivityLevel level))
-//         {
-//             Console.WriteLine($"{node.Type} : {node.Name} → {level}");
-//         }
-//     }
-// }
+    foreach (PirNode node in pirPackage.Nodes)
+    {
+        if (propagated.TryGetValue(node.Id, out SensitivityLevel level))
+        {
+            Console.WriteLine(
+                $"{node.Type} : {node.Name} → {level}"
+            );
+        }
+    }
+
+    /*
+     * Sanitization planning
+     */
+
+    SanitizationPlanner planner = new();
+
+    List<PirNode> sensitiveNodes =
+    analysis.Results
+        .Where(result =>
+            result.Level >= SensitivityLevel.Sensitive)
+        .Select(result => result.Node)
+        .ToList();
+
+List<SanitizationTarget> targets =
+    planner.Plan(
+        sensitiveNodes,
+        node =>
+        {
+            if (!mapper.TryGetSyntaxNode(
+                    node,
+                    out SyntaxNode? syntaxNode))
+            {
+                return null;
+            }
+
+            if (syntaxNode is not VariableDeclaratorSyntax variableNode)
+            {
+                return null;
+            }
+
+            if (variableNode.Initializer is null)
+            {
+                return null;
+            }
+
+            ExpressionSyntax initializer =
+                variableNode.Initializer.Value;
+
+            return new SanitizationTarget
+            {
+                NodeId = node.Id,
+                NodeType = node.Type,
+                FilePath = syntaxNode.SyntaxTree.FilePath,
+                Start = initializer.Span.Start,
+                Length = initializer.Span.Length,
+                OriginalText = initializer.ToFullString(),
+            };
+        });
+
+    Console.WriteLine("\nSANITIZATION TARGETS");
+
+    foreach (SanitizationTarget target in targets)
+    {
+        Console.WriteLine(
+            $"{target.NodeType} : " +
+            $"{target.NodeId}"
+        );
+
+        Console.WriteLine($"  File: {target.FilePath}");
+        Console.WriteLine($"  Start: {target.Start}");
+        Console.WriteLine($"  Length: {target.Length}");
+        Console.WriteLine($"  Original: {target.OriginalText}");
+    }
+}
