@@ -1,6 +1,8 @@
 public class AuthService
 {
     private string password = "abc123";
+    private string apiKey = "real-api-key";
+    private string secret = "super-secret";
 
     public void Login()
     {

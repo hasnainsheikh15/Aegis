@@ -238,6 +238,18 @@ public class RoslynToPirMapper
         return false;
     }
 
+    public bool TryGetPirNode(SyntaxNode syntaxNode, out PirNode? pirNode)
+    {
+        if (nodeLookup.TryGetValue(syntaxNode, out PirNode? mappedNode))
+        {
+            pirNode = mappedNode;
+            return true;
+        }
+
+        pirNode = null;
+        return false;
+    }
+
     private void CreateRelationship(
         PirPackage pirPackage,
         PirNode source,
@@ -471,6 +483,19 @@ public class RoslynToPirMapper
             return null;
         }
 
+        /*
+         * Local variables do not reliably have useful
+         * documentation comment IDs.
+         *
+         * Resolve them using Roslyn's semantic symbol identity.
+         */
+        if (symbol is ILocalSymbol)
+        {
+            localSymbolLookup.TryGetValue(symbol, out PirNode? localNode);
+
+            return localNode;
+        }
+
         string? symbolId = symbol.GetDocumentationCommentId();
 
         if (symbolId is null)
@@ -481,6 +506,13 @@ public class RoslynToPirMapper
         symbolLookup.TryGetValue(symbolId, out PirNode? pirNode);
 
         return pirNode;
+    }
+
+    public bool TryGetPirNode(ISymbol? symbol, out PirNode? pirNode)
+    {
+        pirNode = FindPirNode(symbol);
+
+        return pirNode is not null;
     }
 
     private void MapInterface(InterfaceDeclarationSyntax interfaceNode, PirPackage pirPackage)
@@ -988,6 +1020,4 @@ public class RoslynToPirMapper
             CreateRelationship(pirPackage, sourceNode, targetNode, PirRelationshipType.FLOWS_TO);
         }
     }
-
-    
 }
