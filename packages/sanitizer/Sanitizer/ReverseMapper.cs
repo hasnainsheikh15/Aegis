@@ -9,9 +9,10 @@ public sealed class ReverseMapper
         IEnumerable<SanitizationMapping> mappings
     )
     {
-        List<SanitizationMapping> mappingList = mappings
-            .OrderBy(mapping => mapping.SanitizedStart)
-            .ToList();
+        List<SanitizationMapping> mappingList =
+            mappings
+                .OrderBy(mapping => mapping.SanitizedStart)
+                .ToList();
 
         List<ReverseMappedChange> results = [];
 
@@ -22,7 +23,10 @@ public sealed class ReverseMapper
             foreach (SanitizationMapping mapping in mappingList)
             {
                 ProtectedRegion? region =
-                    FindProtectedRegion(change, mapping);
+                    FindProtectedRegion(
+                        change,
+                        mapping
+                    );
 
                 if (region is not null)
                 {
@@ -66,12 +70,9 @@ public sealed class ReverseMapper
                 .ToList();
 
         /*
-         * The change.Start is a position in the sanitized source.
-         * Translate only the start position.
-         *
-         * We do NOT translate the end independently because the
-         * changed range may contain one or more sanitized regions
-         * whose lengths differ from their real values.
+         * Translate the beginning of the changed region from
+         * sanitized-source coordinates to original-source
+         * coordinates.
          */
         int realStart =
             TranslateSanitizedPositionToOriginal(
@@ -80,29 +81,48 @@ public sealed class ReverseMapper
             );
 
         /*
-         * Reconstruct the exact text that currently exists in the
-         * real source for this changed region.
+         * Reconstruct exactly what existed in the original
+         * source for this changed region.
          *
-         * For example:
+         * Only mappings completely contained inside this
+         * change are allowed to participate.
          *
-         * Sanitized:
-         *     private string password = "DUMMY_PASSWORD";
-         *
-         * Real:
-         *     private string password = "abc123";
+         * If a protected region is only partially covered by
+         * the change, automatic reconstruction is unsafe.
          */
-        string realOriginalText =
+        bool reconstructionFailed;
+
+        string? realOriginalText =
             ReconstructOriginalText(
-                change.OriginalText,
-                mappingList
+                change,
+                mappingList,
+                out reconstructionFailed
             );
+
+        if (
+            reconstructionFailed
+            || realOriginalText is null
+        )
+        {
+            return new ReversePatch
+            {
+                FilePath = change.FilePath,
+                Start = Math.Max(0, realStart),
+                Length = 0,
+                OriginalText = "",
+                ReplacementText = "",
+                RequiresReview = true,
+                Reason =
+                    "The changed region does not align safely "
+                    + "with the sanitization mappings."
+            };
+        }
 
         int realLength =
             realOriginalText.Length;
 
         /*
-         * Make sure the calculated range actually exists in the
-         * original source.
+         * Verify that the calculated original range is valid.
          */
         if (
             realStart < 0
@@ -124,12 +144,11 @@ public sealed class ReverseMapper
         }
 
         /*
-         * Use the actual source text at the calculated location.
+         * Strong consistency check.
          *
-         * This is our strongest consistency check:
-         *
-         * ReversePatch.OriginalText must exactly match the real
-         * source at Start/Length.
+         * The text calculated from the sanitization mappings
+         * MUST exactly equal the text currently present in the
+         * original source.
          */
         string sourceOriginalText =
             originalSource.Substring(
@@ -153,6 +172,10 @@ public sealed class ReverseMapper
             };
         }
 
+        /*
+         * Protected changes require special handling because
+         * the real protected value must NEVER come from the LLM.
+         */
         if (!mappedChange.IsSafe)
         {
             return CreateProtectedPatch(
@@ -163,6 +186,12 @@ public sealed class ReverseMapper
             );
         }
 
+        /*
+         * No protected region is involved.
+         *
+         * The LLM's sanitized change can therefore be used
+         * directly as the replacement text.
+         */
         return new ReversePatch
         {
             FilePath = change.FilePath,
@@ -176,7 +205,7 @@ public sealed class ReverseMapper
         };
     }
 
-    private static ReversePatch? CreateProtectedPatch(
+    private static ReversePatch CreateProtectedPatch(
         ReverseMappedChange mappedChange,
         int realStart,
         int realLength,
@@ -186,6 +215,12 @@ public sealed class ReverseMapper
         SanitizedChange change =
             mappedChange.SourceChange;
 
+        /*
+         * Alpha safety rule:
+         *
+         * If multiple protected regions occur inside the same
+         * changed region, do not attempt automatic reconstruction.
+         */
         if (mappedChange.ProtectedRegions.Count != 1)
         {
             return new ReversePatch
@@ -197,8 +232,9 @@ public sealed class ReverseMapper
                 ReplacementText = realOriginalText,
                 RequiresReview = true,
                 Reason =
-                    "Change contains multiple protected regions and "
-                    + "cannot be safely reconstructed automatically."
+                    "Change contains multiple protected regions "
+                    + "and cannot be safely reconstructed "
+                    + "automatically."
             };
         }
 
@@ -206,27 +242,46 @@ public sealed class ReverseMapper
             mappedChange.ProtectedRegions[0];
 
         /*
-         * The LLM must preserve the exact dummy value.
+         * The exact dummy value must still exist in the LLM's
+         * output.
          *
          * Example:
          *
          *     Hash("DUMMY_PASSWORD")
          *
-         * is safe to reconstruct.
+         * is acceptable.
          *
          * But:
          *
-         *     Hash("DUMMY_PASSWORD + SALT")
+         *     Hash("DUMMY_PASSWORD" + salt)
          *
-         * modifies the protected value and therefore requires review.
+         * means the protected value was modified and therefore
+         * requires human review.
          */
-        int dummyStart =
+        int firstDummyStart =
             change.NewText.IndexOf(
                 protectedRegion.DummyText,
                 StringComparison.Ordinal
             );
 
-        if (dummyStart < 0)
+        int lastDummyStart =
+            change.NewText.LastIndexOf(
+                protectedRegion.DummyText,
+                StringComparison.Ordinal
+            );
+
+        /*
+         * Dummy must exist exactly once.
+         *
+         * Zero occurrences means the LLM removed or modified it.
+         *
+         * Multiple occurrences are ambiguous and therefore
+         * unsafe to reconstruct automatically.
+         */
+        if (
+            firstDummyStart < 0
+            || firstDummyStart != lastDummyStart
+        )
         {
             return new ReversePatch
             {
@@ -237,19 +292,26 @@ public sealed class ReverseMapper
                 ReplacementText = realOriginalText,
                 RequiresReview = true,
                 Reason =
-                    "The LLM removed or modified the protected dummy "
-                    + "value, so automatic reverse mapping is unsafe."
+                    "The protected dummy value was removed, "
+                    + "modified, or appears multiple times in "
+                    + "the LLM output."
             };
         }
 
+        /*
+         * Replace ONLY the dummy value with the original value.
+         *
+         * The original secret therefore comes exclusively from
+         * Aegis's local mapping.
+         */
         string replacementText =
             change.NewText
                 .Remove(
-                    dummyStart,
+                    firstDummyStart,
                     protectedRegion.DummyText.Length
                 )
                 .Insert(
-                    dummyStart,
+                    firstDummyStart,
                     protectedRegion.OriginalText
                 );
 
@@ -263,7 +325,8 @@ public sealed class ReverseMapper
             RequiresReview = false,
             Reason =
                 "Protected value was preserved by the LLM and "
-                + "was reconstructed from the original source mapping."
+                + "was reconstructed from the original source "
+                + "mapping."
         };
     }
 
@@ -285,6 +348,9 @@ public sealed class ReverseMapper
             mapping.SanitizedStart
             + mapping.SanitizedLength;
 
+        /*
+         * No overlap.
+         */
         if (
             mappingStart >= changeEnd
             || mappingEnd <= changeStart
@@ -326,7 +392,7 @@ public sealed class ReverseMapper
 
     private static int TranslateSanitizedPositionToOriginal(
         int sanitizedPosition,
-        IEnumerable<SanitizationMapping> mappings
+        IReadOnlyList<SanitizationMapping> mappings
     )
     {
         int originalPosition =
@@ -341,11 +407,21 @@ public sealed class ReverseMapper
                 mapping.SanitizedStart
                 + mapping.SanitizedLength;
 
+            /*
+             * This mapping occurs after the position we're
+             * translating.
+             */
             if (sanitizedPosition < sanitizedStart)
             {
                 break;
             }
 
+            /*
+             * This entire mapping occurs before the position.
+             *
+             * Account for the difference between the sanitized
+             * and original lengths.
+             */
             if (sanitizedPosition >= sanitizedEnd)
             {
                 originalPosition -=
@@ -356,11 +432,11 @@ public sealed class ReverseMapper
             }
 
             /*
-             * The position falls inside a sanitized protected region.
+             * The position falls inside a protected region.
              *
-             * There is no one-to-one coordinate mapping inside the
-             * replaced value. For the alpha implementation, map it
-             * to the beginning of the corresponding original value.
+             * There is no one-to-one mapping inside the replaced
+             * value. For the alpha, map to the beginning of the
+             * original protected value.
              */
             originalPosition =
                 mapping.OriginalStart;
@@ -371,46 +447,124 @@ public sealed class ReverseMapper
         return originalPosition;
     }
 
-    private static string ReconstructOriginalText(
-        string sanitizedText,
-        IEnumerable<SanitizationMapping> mappings
+    private static string? ReconstructOriginalText(
+        SanitizedChange change,
+        IReadOnlyList<SanitizationMapping> mappings,
+        out bool failed
     )
     {
-        string result = sanitizedText;
+        failed = false;
+
+        string result =
+            change.OriginalText;
+
+        int changeStart =
+            change.Start;
+
+        int changeEnd =
+            change.Start + change.OriginalLength;
 
         /*
-         * We only care about mappings whose dummy text actually
-         * occurs inside this particular changed region.
-         *
-         * We replace the actual dummy text rather than calculating
-         * offsets from the entire source.
+         * Find mappings that are completely contained inside
+         * this changed region.
          */
-        foreach (
-            SanitizationMapping mapping in mappings
+        List<SanitizationMapping> containedMappings =
+            mappings
+                .Where(mapping =>
+                {
+                    int mappingStart =
+                        mapping.SanitizedStart;
+
+                    int mappingEnd =
+                        mapping.SanitizedStart
+                        + mapping.SanitizedLength;
+
+                    return
+                        mappingStart >= changeStart
+                        && mappingEnd <= changeEnd;
+                })
                 .OrderByDescending(
                     mapping => mapping.SanitizedStart
                 )
-        )
+                .ToList();
+
+        /*
+         * If a mapping overlaps the change but is not completely
+         * contained inside it, the diff split through a protected
+         * region.
+         *
+         * We cannot safely reconstruct that automatically.
+         */
+        foreach (SanitizationMapping mapping in mappings)
         {
-            int dummyStart =
-                result.IndexOf(
-                    mapping.DummyText,
-                    StringComparison.Ordinal
+            int mappingStart =
+                mapping.SanitizedStart;
+
+            int mappingEnd =
+                mapping.SanitizedStart
+                + mapping.SanitizedLength;
+
+            bool overlaps =
+                mappingStart < changeEnd
+                && mappingEnd > changeStart;
+
+            bool contained =
+                mappingStart >= changeStart
+                && mappingEnd <= changeEnd;
+
+            if (overlaps && !contained)
+            {
+                failed = true;
+                return null;
+            }
+        }
+
+        /*
+         * Process from right to left.
+         *
+         * Replacing a mapping on the right changes only positions
+         * after mappings on its left, so the relative positions of
+         * the remaining mappings stay valid.
+         */
+        foreach (SanitizationMapping mapping in containedMappings)
+        {
+            int relativeStart =
+                mapping.SanitizedStart - changeStart;
+
+            if (
+                relativeStart < 0
+                || relativeStart + mapping.SanitizedLength
+                    > result.Length
+            )
+            {
+                failed = true;
+                return null;
+            }
+
+            /*
+             * Verify that the text at the expected coordinate is
+             * actually the dummy text.
+             */
+            string actualDummy =
+                result.Substring(
+                    relativeStart,
+                    mapping.SanitizedLength
                 );
 
-            if (dummyStart < 0)
+            if (actualDummy != mapping.DummyText)
             {
-                continue;
+                failed = true;
+                return null;
             }
 
             result =
                 result
                     .Remove(
-                        dummyStart,
-                        mapping.DummyText.Length
+                        relativeStart,
+                        mapping.SanitizedLength
                     )
                     .Insert(
-                        dummyStart,
+                        relativeStart,
                         mapping.OriginalText
                     );
         }
