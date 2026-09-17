@@ -136,50 +136,128 @@ public sealed class GraphAnalyzer
         }
     }
 
-    public ProgramSlice BuildDependencySlice(PirNode start, DependencyOptions options)
-    {
-        ProgramSlice slice = new();
+    public ProgramSlice BuildDependencySlice(
+    PirNode start,
+    DependencyOptions options
+)
+{
+    ProgramSlice slice = new();
 
-        HashSet<string> visited = [start.Id];
+    HashSet<string> visited = [start.Id];
 
-        slice.Nodes.Add(start);
+    slice.Nodes.Add(start);
 
-        BuildSliceDFS(start, options, visited, slice);
+    BuildSliceDFS(
+        start,
+        options,
+        visited,
+        slice
+    );
 
-        return slice;
-    }
+    return slice;
+}
 
-    private void BuildSliceDFS(
-        PirNode node,
-        DependencyOptions options,
-        HashSet<string> visited,
-        ProgramSlice slice
+private void BuildSliceDFS(
+    PirNode node,
+    DependencyOptions options,
+    HashSet<string> visited,
+    ProgramSlice slice
+)
+{
+    /*
+     * ------------------------------------------------------------
+     * OUTGOING RELATIONSHIPS
+     * ------------------------------------------------------------
+     *
+     * These represent things that depend on / are reached from
+     * the current node.
+     *
+     * Example:
+     *
+     *     token -> backup
+     */
+    foreach (
+        PirRelationship relationship
+            in graph.GetOutgoingRelationships(node)
     )
     {
-        foreach (PirRelationship relationship in graph.GetOutgoingRelationships(node))
+        if (!options.RelationshipTypes.Contains(relationship.Type))
         {
-            if (!options.RelationshipTypes.Contains(relationship.Type))
-            {
-                continue;
-            }
-
-            PirNode? target = graph.GetNode(relationship.TargetId);
-
-            if (target is null)
-            {
-                continue;
-            }
-
-            slice.Relationships.Add(relationship);
-
-            if (!visited.Add(target.Id))
-            {
-                continue;
-            }
-
-            slice.Nodes.Add(target);
-
-            BuildSliceDFS(target, options, visited, slice);
+            continue;
         }
+
+        PirNode? target =
+            graph.GetNode(relationship.TargetId);
+
+        if (target is null)
+        {
+            continue;
+        }
+
+        slice.Relationships.Add(relationship);
+
+        if (!visited.Add(target.Id))
+        {
+            continue;
+        }
+
+        slice.Nodes.Add(target);
+
+        BuildSliceDFS(
+            target,
+            options,
+            visited,
+            slice
+        );
     }
+
+    /*
+     * ------------------------------------------------------------
+     * INCOMING RELATIONSHIPS
+     * ------------------------------------------------------------
+     *
+     * These represent things the current node depends on.
+     *
+     * Example:
+     *
+     *     password -> token
+     *
+     * When token is selected, we must be able to walk backwards
+     * to password.
+     */
+    foreach (
+        PirRelationship relationship
+            in graph.GetIncomingRelationships(node)
+    )
+    {
+        if (!options.RelationshipTypes.Contains(relationship.Type))
+        {
+            continue;
+        }
+
+        PirNode? source =
+            graph.GetNode(relationship.SourceId);
+
+        if (source is null)
+        {
+            continue;
+        }
+
+        slice.Relationships.Add(relationship);
+
+        if (!visited.Add(source.Id))
+        {
+            continue;
+        }
+
+        slice.Nodes.Add(source);
+
+        BuildSliceDFS(
+            source,
+            options,
+            visited,
+            slice
+        );
+    }
+}
 }
