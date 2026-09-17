@@ -13,4 +13,8 @@ public sealed class SanitizationMapping
     public required int OriginalStart { get; init; }
 
     public required int OriginalLength { get; init; }
+
+    public required int SanitizedStart { get; init; }
+
+    public required int SanitizedLength { get; init; }
 }

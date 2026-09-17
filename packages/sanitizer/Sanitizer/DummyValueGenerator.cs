@@ -4,7 +4,13 @@ public sealed class DummyValueGenerator
 {
     public string Generate(string originalText, string nodeName)
     {
-        return nodeName switch
+        string normalizedName =
+            nodeName
+                .Replace("_", "")
+                .Replace("-", "")
+                .ToLowerInvariant();
+
+        return normalizedName switch
         {
             "password" => "\"DUMMY_PASSWORD\"",
             "passwd" => "\"DUMMY_PASSWORD\"",
@@ -14,6 +20,7 @@ public sealed class DummyValueGenerator
             "accesstoken" => "\"DUMMY_ACCESS_TOKEN\"",
             "privatekey" => "\"DUMMY_PRIVATE_KEY\"",
             "connectionstring" => "\"DUMMY_CONNECTION_STRING\"",
+            "credential" => "\"DUMMY_CREDENTIAL\"",
             _ => "\"DUMMY_VALUE\""
         };
     }

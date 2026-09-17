@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.Text;
 using RoslynWorker.Mappers;
 using RoslynWorker.Printers;
 using RoslynWorker.Selection;
+using RoslynWorker.Validation;
 
 if (args.Length == 0)
 {
@@ -66,74 +67,6 @@ foreach (SyntaxTree syntaxTree in syntaxTrees)
 
     pirPackage.Relationships.AddRange(filePackage.Relationships);
 }
-
-/*
- * Temporary source selection test
- */
-
-
-// string programSource = File.ReadAllText(
-//     Path.Combine(projectPath, "Program.cs")
-// );
-
-// string statement = "string backup = token;";
-
-// int statementStart = programSource.IndexOf(
-//     statement,
-//     StringComparison.Ordinal
-// );
-
-// int tokenStart =
-//     statementStart + "string backup = ".Length;
-
-// SourceSelection selection = new()
-// {
-//     FilePath = Path.GetFullPath(
-//         Path.Combine(projectPath, "Program.cs")
-//     ),
-//     Start = tokenStart,
-//     Length = "token".Length,
-// };
-// string selectedSource = File.ReadAllText(selection.FilePath)
-//     .Substring(selection.Start, selection.Length);
-
-// Console.WriteLine("\nSELECTED SOURCE");
-// Console.WriteLine("----------------");
-// Console.WriteLine(selectedSource);
-// Console.WriteLine("----------------");
-
-// SelectionResolver selectionResolver = new();
-
-// SyntaxTree? selectedSyntaxTree = syntaxTrees.FirstOrDefault(tree =>
-//     string.Equals(
-//         Path.GetFullPath(tree.FilePath),
-//         selection.FilePath,
-//         StringComparison.OrdinalIgnoreCase
-//     )
-// );
-
-// List<PirNode> selectedNodes = [];
-
-// if (selectedSyntaxTree is not null)
-// {
-//     SemanticModel selectedSemanticModel = compilation.GetSemanticModel(selectedSyntaxTree);
-
-//     selectedNodes = selectionResolver.Resolve(
-//         selectedSyntaxTree,
-//         selectedSemanticModel,
-//         selection,
-//         mapper
-//     );
-// }
-
-// Console.WriteLine("\nSELECTED PIR NODES");
-
-// foreach (PirNode node in selectedNodes)
-// {
-//     Console.WriteLine($"  {node.Type} : {node.Name}");
-// }
-
-// Console.WriteLine();
 
 static string GetNodeName(string nodeId, PirPackage pirPackage)
 {
@@ -361,22 +294,100 @@ foreach ((string filePath, List<SanitizationTarget> fileTargets) in targetsByFil
         out string sanitizedSource
     );
 
-    Console.WriteLine("\nSANITIZED SOURCE");
+    Console.WriteLine();
+    Console.WriteLine("SANITIZED CHANGES");
 
-    Console.WriteLine(sanitizedSource);
+    SanitizedChangeDetector changeDetector = new();
 
-    Console.WriteLine("\nSANITIZATION MAPPINGS");
+    string modifiedSanitizedSource = sanitizedSource
+        .Replace("string token = password;", "string token = Hash(password);")
+        .Replace("string backup = token;", "string backup = Encrypt(token);")
+        .Replace(
+            "private string password = \"DUMMY_PASSWORD\";",
+            "private string password = Hash(\"DUMMY_PASSWORD\");"
+        );
 
-    foreach (SanitizationMapping mapping in mappings)
+    List<SanitizedChange> changes = changeDetector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        filePath
+    );
+
+    ReverseMapper reverseMapper = new();
+
+    List<ReverseMappedChange> reverseResults = reverseMapper.Analyze(changes, mappings);
+
+    Console.WriteLine();
+    Console.WriteLine("REVERSE MAPPING ANALYSIS");
+
+    foreach (ReverseMappedChange result in reverseResults)
     {
-        Console.WriteLine($"{mapping.OriginalText} → " + $"{mapping.DummyText}");
+        SanitizedChange change = result.SourceChange;
 
-        Console.WriteLine($"  Node ID: {mapping.NodeId}");
+        Console.WriteLine($"Start: {change.Start}");
+        Console.WriteLine($"Original: {change.OriginalText}");
+        Console.WriteLine($"New: {change.NewText}");
+        Console.WriteLine($"Safe: {result.IsSafe}");
 
-        Console.WriteLine($"  File: {mapping.FilePath}");
+        foreach (ProtectedRegion region in result.ProtectedRegions)
+        {
+            Console.WriteLine(
+                $"  Protected Region: Start={region.Start}, " + $"Length={region.Length}"
+            );
 
-        Console.WriteLine($"  Start: {mapping.OriginalStart}");
+            Console.WriteLine($"  Dummy: {region.DummyText}");
 
-        Console.WriteLine($"  Length: {mapping.OriginalLength}");
+            Console.WriteLine($"  Real: {region.OriginalText}");
+
+            Console.WriteLine($"  Node ID: {region.NodeId}");
+        }
+
+        if (result.Reason is not null)
+        {
+            Console.WriteLine($"Reason: {result.Reason}");
+        }
+
+        Console.WriteLine();
+    }
+
+    PatchValidator patchValidator = new();
+
+    Console.WriteLine();
+    Console.WriteLine("REVERSE PATCH CANDIDATES");
+
+    foreach (ReverseMappedChange result in reverseResults)
+    {
+        ReversePatch? patch = reverseMapper.CreatePatch(result, mappings, source);
+
+        if (patch is null)
+            continue;
+
+        Console.WriteLine($"File: {patch.FilePath}");
+        Console.WriteLine($"Start: {patch.Start}");
+        Console.WriteLine($"Original: {patch.OriginalText}");
+        Console.WriteLine($"Replacement: {patch.ReplacementText}");
+        Console.WriteLine($"Requires Review: {patch.RequiresReview}");
+        Console.WriteLine($"Reason: {patch.Reason}");
+
+        if (patch.RequiresReview)
+        {
+            Console.WriteLine("Validation: SKIPPED — requires review.");
+            Console.WriteLine();
+
+            continue;
+        }
+
+        string originalSource = File.ReadAllText(patch.FilePath);
+
+        PatchValidationResult validation = patchValidator.Validate(originalSource, patch);
+
+        Console.WriteLine($"Validation: {(validation.IsValid ? "PASSED" : "FAILED")}");
+
+        foreach (string diagnostic in validation.Diagnostics)
+        {
+            Console.WriteLine($"  {diagnostic}");
+        }
+
+        Console.WriteLine();
     }
 }
