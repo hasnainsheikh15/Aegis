@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Sanitizer.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9e7e77b3b3b8d60da5635c6628ff995ee0cdcd26")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9e319a19b811f5b8ed3d8db19b4dd980780e79a6")]
 [assembly: System.Reflection.AssemblyProductAttribute("Sanitizer.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Sanitizer.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

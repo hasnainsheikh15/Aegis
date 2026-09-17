@@ -451,4 +451,71 @@ public sealed class ReverseMapperTests
 
         Assert.Contains("does not match", patch.Reason, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+public void LLMReturnsRealSecret_RequiresReview()
+{
+    string originalSource =
+        "private string password = \"abc123\";\r\n";
+
+    string sanitizedSource =
+        "private string password = \"DUMMY_PASSWORD\";\r\n";
+
+    /*
+     * Simulate a malicious, confused, or hallucinating LLM that
+     * returns the actual protected value.
+     *
+     * Aegis must NEVER trust the value coming from the LLM.
+     */
+    string modifiedSanitizedSource =
+        "private string password = \"abc123\";\r\n";
+
+    SanitizationMapping mapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = 26,
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = 26,
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes =
+        detector.Detect(
+            sanitizedSource,
+            modifiedSanitizedSource,
+            "Program.cs"
+        );
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(
+            changes,
+            [mapping]
+        );
+
+    Assert.Single(analyzed);
+
+    ReversePatch? patch =
+        mapper.CreatePatch(
+            analyzed[0],
+            [mapping],
+            originalSource
+        );
+
+    Assert.NotNull(patch);
+
+    /*
+     * The LLM supplied the real secret.
+     *
+     * This must require human review. Aegis must not treat
+     * LLM-provided secret text as trusted reconstruction.
+     */
+    Assert.True(patch.RequiresReview);
+}
 }
