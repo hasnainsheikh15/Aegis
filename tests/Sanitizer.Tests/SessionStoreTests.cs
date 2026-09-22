@@ -35,7 +35,7 @@ public class SessionStoreTests
 
                         SanitizedSourceHash = "sanitized-hash",
 
-                        BaselineSanitizedFilePath = baselinePath,
+                        BaselineSanitizedFilePath = "baseline/Program.cs",
 
                         Mappings =
                         [
