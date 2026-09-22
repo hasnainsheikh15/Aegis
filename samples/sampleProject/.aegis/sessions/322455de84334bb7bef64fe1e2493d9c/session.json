@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "SessionId": "322455de84334bb7bef64fe1e2493d9c",
+  "Files": [
+    {
+      "OriginalFilePath": "D:\\Aegis\\samples\\sampleProject\\Program.cs",
+      "SanitizedFilePath": "D:\\Aegis\\samples\\sampleProject\\.aegis\\sessions\\322455de84334bb7bef64fe1e2493d9c\\sanitized\\Program.cs",
+      "OriginalSourceHash": "0ac1fc709a465116c1a0e6e4a6996a226ba40c822d47d151c03297fe71fcc4ae",
+      "SanitizedSourceHash": "5508b3267aba39c63f4c5413bbf54482690ce439ef3ffdc88bc34c4c46dc6673",
+      "Mappings": [
+        {
+          "NodeId": "3a592ccd-940e-4908-a72e-cb88c1ae8bbe",
+          "NodeType": "Field",
+          "OriginalText": "\u0022abc123\u0022",
+          "DummyText": "\u0022DUMMY_PASSWORD\u0022",
+          "OriginalStart": 59,
+          "OriginalLength": 8,
+          "SanitizedStart": 59,
+          "SanitizedLength": 16
+        }
+      ]
+    }
+  ]
+}

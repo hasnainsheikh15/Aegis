@@ -3,6 +3,7 @@ using Aegis.Pir;
 using Aegis.Pir.Enums;
 using Aegis.Sanitizer;
 using Aegis.Sanitizer.Models;
+using Aegis.Sanitizer.Models.Session;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,69 +14,53 @@ using RoslynWorker.Validation;
 
 if (args.Length < 4)
 {
-    Console.WriteLine(
-        "Usage: RoslynWorker <project-folder> <file-path> <start> <length>"
-    );
+    Console.WriteLine("Usage: RoslynWorker <project-folder> <file-path> <start> <length>");
 
     return;
 }
 
-string projectPath =
-    Path.GetFullPath(args[0]);
+string projectPath = Path.GetFullPath(args[0]);
 
-string selectedFilePath =
-    Path.GetFullPath(args[1]);
+string selectedFilePath = Path.GetFullPath(args[1]);
 
 if (!Directory.Exists(projectPath))
 {
-    Console.WriteLine(
-        $"Project directory not found: {projectPath}"
-    );
+    Console.WriteLine($"Project directory not found: {projectPath}");
 
     return;
 }
 
 if (!File.Exists(selectedFilePath))
 {
-    Console.WriteLine(
-        $"Selected file not found: {selectedFilePath}"
-    );
+    Console.WriteLine($"Selected file not found: {selectedFilePath}");
 
     return;
 }
 
 if (!int.TryParse(args[2], out int selectionStart))
 {
-    Console.WriteLine(
-        "Selection start must be an integer."
-    );
+    Console.WriteLine("Selection start must be an integer.");
 
     return;
 }
 
 if (!int.TryParse(args[3], out int selectionLength))
 {
-    Console.WriteLine(
-        "Selection length must be an integer."
-    );
+    Console.WriteLine("Selection length must be an integer.");
 
     return;
 }
 
 if (selectionStart < 0)
 {
-    Console.WriteLine(
-        "Selection start cannot be negative."
-    );
+    Console.WriteLine("Selection start cannot be negative.");
 
     return;
 }
 
 if (selectionLength < 0)
 {
-    Console.WriteLine(
-        "Selection length cannot be negative."
-    );
+    Console.WriteLine("Selection length cannot be negative.");
 
     return;
 }
@@ -86,21 +71,16 @@ if (selectionLength < 0)
  * ============================================================
  */
 
-string[] files =
-    Directory.GetFiles(
-        projectPath,
-        "*.cs",
-        SearchOption.AllDirectories
-    );
-
-if (files.Length == 0)
-{
-    Console.WriteLine(
-        "No C# files found in the project."
-    );
-
-    return;
-}
+string[] files = Directory
+    .GetFiles(projectPath, "*.cs", SearchOption.AllDirectories)
+    .Where(file =>
+        !Path.GetFullPath(file)
+            .StartsWith(
+                Path.Combine(projectPath, ".aegis") + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            )
+    )
+    .ToArray();
 
 /*
  * ============================================================
@@ -112,14 +92,9 @@ List<SyntaxTree> syntaxTrees = [];
 
 foreach (string file in files)
 {
-    string sourceCode =
-        File.ReadAllText(file);
+    string sourceCode = File.ReadAllText(file);
 
-    SyntaxTree syntaxTree =
-        CSharpSyntaxTree.ParseText(
-            sourceCode,
-            path: file
-        );
+    SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(sourceCode, path: file);
 
     syntaxTrees.Add(syntaxTree);
 }
@@ -135,21 +110,15 @@ foreach (string file in files)
 
 MetadataReference[] references =
 [
-    MetadataReference.CreateFromFile(
-        typeof(object).Assembly.Location
-    ),
-
-    MetadataReference.CreateFromFile(
-        typeof(Console).Assembly.Location
-    ),
+    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
 ];
 
-CSharpCompilation compilation =
-    CSharpCompilation.Create(
-        assemblyName: "AegisAnalysis",
-        syntaxTrees: syntaxTrees,
-        references: references
-    );
+CSharpCompilation compilation = CSharpCompilation.Create(
+    assemblyName: "AegisAnalysis",
+    syntaxTrees: syntaxTrees,
+    references: references
+);
 
 /*
  * ============================================================
@@ -157,33 +126,21 @@ CSharpCompilation compilation =
  * ============================================================
  */
 
-RoslynToPirMapper mapper =
-    new();
+RoslynToPirMapper mapper = new();
 
-PirPackage pirPackage =
-    new();
+PirPackage pirPackage = new();
 
 foreach (SyntaxTree syntaxTree in syntaxTrees)
 {
-    CompilationUnitSyntax root =
-        syntaxTree.GetCompilationUnitRoot();
+    CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
-    SemanticModel semanticModel =
-        compilation.GetSemanticModel(syntaxTree);
+    SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-    PirPackage filePackage =
-        mapper.MapCompilationUnit(
-            root,
-            semanticModel
-        );
+    PirPackage filePackage = mapper.MapCompilationUnit(root, semanticModel);
 
-    pirPackage.Nodes.AddRange(
-        filePackage.Nodes
-    );
+    pirPackage.Nodes.AddRange(filePackage.Nodes);
 
-    pirPackage.Relationships.AddRange(
-        filePackage.Relationships
-    );
+    pirPackage.Relationships.AddRange(filePackage.Relationships);
 }
 
 /*
@@ -192,89 +149,67 @@ foreach (SyntaxTree syntaxTree in syntaxTrees)
  * ============================================================
  */
 
-SyntaxTree? selectedSyntaxTree =
-    syntaxTrees.FirstOrDefault(
-        tree =>
-            string.Equals(
-                Path.GetFullPath(tree.FilePath),
-                selectedFilePath,
-                StringComparison.OrdinalIgnoreCase
-            )
-    );
+SyntaxTree? selectedSyntaxTree = syntaxTrees.FirstOrDefault(tree =>
+    string.Equals(
+        Path.GetFullPath(tree.FilePath),
+        selectedFilePath,
+        StringComparison.OrdinalIgnoreCase
+    )
+);
 
 if (selectedSyntaxTree is null)
 {
     Console.WriteLine(
-        $"Selected file is not part of the analyzed project: "
-        + $"{selectedFilePath}"
+        $"Selected file is not part of the analyzed project: " + $"{selectedFilePath}"
     );
 
     return;
 }
 
-string selectedSource =
-    File.ReadAllText(selectedFilePath);
+string selectedSource = File.ReadAllText(selectedFilePath);
 
 if (
     selectionStart > selectedSource.Length
     || selectionLength > selectedSource.Length - selectionStart
 )
 {
-    Console.WriteLine(
-        "Selection range is outside the selected file."
-    );
+    Console.WriteLine("Selection range is outside the selected file.");
 
     return;
 }
 
-SourceSelection selection =
-    new()
-    {
-        FilePath = selectedFilePath,
-        Start = selectionStart,
-        Length = selectionLength,
-    };
+SourceSelection selection = new()
+{
+    FilePath = selectedFilePath,
+    Start = selectionStart,
+    Length = selectionLength,
+};
 
-SemanticModel selectedSemanticModel =
-    compilation.GetSemanticModel(
-        selectedSyntaxTree
-    );
+SemanticModel selectedSemanticModel = compilation.GetSemanticModel(selectedSyntaxTree);
 
-SelectionResolver selectionResolver =
-    new();
+SelectionResolver selectionResolver = new();
 
-List<PirNode> selectedNodes =
-    selectionResolver.Resolve(
-        selectedSyntaxTree,
-        selectedSemanticModel,
-        selection,
-        mapper
-    );
+List<PirNode> selectedNodes = selectionResolver.Resolve(
+    selectedSyntaxTree,
+    selectedSemanticModel,
+    selection,
+    mapper
+);
 
 Console.WriteLine();
 Console.WriteLine("SELECTION");
 
-Console.WriteLine(
-    $"File: {selection.FilePath}"
-);
+Console.WriteLine($"File: {selection.FilePath}");
 
-Console.WriteLine(
-    $"Start: {selection.Start}"
-);
+Console.WriteLine($"Start: {selection.Start}");
 
-Console.WriteLine(
-    $"Length: {selection.Length}"
-);
+Console.WriteLine($"Length: {selection.Length}");
 
-Console.WriteLine(
-    $"Selected nodes: {selectedNodes.Count}"
-);
+Console.WriteLine($"Selected nodes: {selectedNodes.Count}");
 
 foreach (PirNode node in selectedNodes)
 {
-    Console.WriteLine(
-        $"  {node.Type} : {node.Name}"
-    );
+    Console.WriteLine($"  {node.Type} : {node.Name}");
 }
 
 /*
@@ -291,9 +226,7 @@ foreach (PirNode node in selectedNodes)
 if (selectedNodes.Count == 0)
 {
     Console.WriteLine();
-    Console.WriteLine(
-        "No PIR node could be resolved from the selection."
-    );
+    Console.WriteLine("No PIR node could be resolved from the selection.");
 
     return;
 }
@@ -301,24 +234,17 @@ if (selectedNodes.Count == 0)
 if (selectedNodes.Count > 1)
 {
     Console.WriteLine();
-    Console.WriteLine(
-        "Selection resolved to multiple PIR nodes."
-    );
+    Console.WriteLine("Selection resolved to multiple PIR nodes.");
 
-    Console.WriteLine(
-        "The alpha currently requires exactly one selected node."
-    );
+    Console.WriteLine("The alpha currently requires exactly one selected node.");
 
     return;
 }
 
-PirNode selectedNode =
-    selectedNodes[0];
+PirNode selectedNode = selectedNodes[0];
 
 Console.WriteLine();
-Console.WriteLine(
-    $"Selected root: {selectedNode.Type} : {selectedNode.Name}"
-);
+Console.WriteLine($"Selected root: {selectedNode.Type} : {selectedNode.Name}");
 
 /*
  * ============================================================
@@ -326,24 +252,21 @@ Console.WriteLine(
  * ============================================================
  */
 
-PirGraph graph =
-    new(pirPackage);
+PirGraph graph = new(pirPackage);
 
-GraphAnalyzer graphAnalyzer =
-    new(graph);
+GraphAnalyzer graphAnalyzer = new(graph);
 
-DependencyOptions options =
-    new()
-    {
-        RelationshipTypes =
-        [
-            PirRelationshipType.CALLS,
-            PirRelationshipType.READS,
-            PirRelationshipType.WRITES,
-            PirRelationshipType.CREATES,
-            PirRelationshipType.FLOWS_TO,
-        ],
-    };
+DependencyOptions options = new()
+{
+    RelationshipTypes =
+    [
+        PirRelationshipType.CALLS,
+        PirRelationshipType.READS,
+        PirRelationshipType.WRITES,
+        PirRelationshipType.CREATES,
+        PirRelationshipType.FLOWS_TO,
+    ],
+};
 
 /*
  * ============================================================
@@ -353,37 +276,27 @@ DependencyOptions options =
  * Analyze the entire PIR.
  */
 
-SensitivityAnalyzer sensitivityAnalyzer =
-    new();
+SensitivityAnalyzer sensitivityAnalyzer = new();
 
 List<SensitivityResult> intrinsicResults = [];
 
 foreach (PirNode node in pirPackage.Nodes)
 {
-    SensitivityResult result =
-        sensitivityAnalyzer.Analyze(node);
+    SensitivityResult result = sensitivityAnalyzer.Analyze(node);
 
     intrinsicResults.Add(result);
 }
 
 Console.WriteLine();
-Console.WriteLine(
-    "SENSITIVITY ANALYSIS"
-);
+Console.WriteLine("SENSITIVITY ANALYSIS");
 
 foreach (SensitivityResult result in intrinsicResults)
 {
-    Console.WriteLine(
-        $"{result.Node.Type} : "
-        + $"{result.Node.Name} → "
-        + $"{result.Level}"
-    );
+    Console.WriteLine($"{result.Node.Type} : " + $"{result.Node.Name} → " + $"{result.Level}");
 
     foreach (string reason in result.Reasons)
     {
-        Console.WriteLine(
-            $"  Reason: {reason}"
-        );
+        Console.WriteLine($"  Reason: {reason}");
     }
 }
 
@@ -395,22 +308,14 @@ foreach (SensitivityResult result in intrinsicResults)
  * The dependency root is now the ACTUAL USER SELECTION.
  */
 
-ProgramSlice slice =
-    graphAnalyzer.BuildDependencySlice(
-        selectedNode,
-        options
-    );
+ProgramSlice slice = graphAnalyzer.BuildDependencySlice(selectedNode, options);
 
 Console.WriteLine();
-Console.WriteLine(
-    "DEPENDENCY SLICE"
-);
+Console.WriteLine("DEPENDENCY SLICE");
 
 foreach (PirNode node in slice.Nodes)
 {
-    Console.WriteLine(
-        $"  {node.Type} : {node.Name}"
-    );
+    Console.WriteLine($"  {node.Type} : {node.Name}");
 }
 
 /*
@@ -418,47 +323,22 @@ foreach (PirNode node in slice.Nodes)
  * belonging to the selected node's dependency slice.
  */
 
-List<SensitivityResult> sliceResults =
-    slice.Nodes
-        .Select(
-            node =>
-                intrinsicResults.First(
-                    result =>
-                        result.Node.Id == node.Id
-                )
-        )
-        .ToList();
+List<SensitivityResult> sliceResults = slice
+    .Nodes.Select(node => intrinsicResults.First(result => result.Node.Id == node.Id))
+    .ToList();
 
-SensitivityPropagator propagator =
-    new(
-        graph,
-        pirPackage
-    );
+SensitivityPropagator propagator = new(graph, pirPackage);
 
-Dictionary<string, SensitivityLevel> propagated =
-    propagator.Propagate(
-        sliceResults
-    );
+Dictionary<string, SensitivityLevel> propagated = propagator.Propagate(sliceResults);
 
 Console.WriteLine();
-Console.WriteLine(
-    "PROPAGATED SENSITIVITY"
-);
+Console.WriteLine("PROPAGATED SENSITIVITY");
 
 foreach (PirNode node in slice.Nodes)
 {
-    if (
-        propagated.TryGetValue(
-            node.Id,
-            out SensitivityLevel level
-        )
-    )
+    if (propagated.TryGetValue(node.Id, out SensitivityLevel level))
     {
-        Console.WriteLine(
-            $"{node.Type} : "
-            + $"{node.Name} → "
-            + $"{level}"
-        );
+        Console.WriteLine($"{node.Type} : " + $"{node.Name} → " + $"{level}");
     }
 }
 
@@ -476,361 +356,247 @@ foreach (PirNode node in slice.Nodes)
  * the context relevant to the user's selected root.
  */
 
-HashSet<string> sliceNodeIds =
-    slice.Nodes
-        .Select(node => node.Id)
-        .ToHashSet();
+HashSet<string> sliceNodeIds = slice.Nodes.Select(node => node.Id).ToHashSet();
 
-List<PirNode> sensitiveNodes =
-    intrinsicResults
-        .Where(
-            result =>
-                result.Level >= SensitivityLevel.Sensitive
-                && sliceNodeIds.Contains(result.Node.Id)
-        )
-        .Select(
-            result => result.Node
-        )
-        .ToList();
+List<PirNode> sensitiveNodes = intrinsicResults
+    .Where(result =>
+        result.Level >= SensitivityLevel.Sensitive && sliceNodeIds.Contains(result.Node.Id)
+    )
+    .Select(result => result.Node)
+    .ToList();
 
-SanitizationPlanner planner =
-    new();
+SanitizationPlanner planner = new();
 
-List<SanitizationTarget> targets =
-    planner.Plan(
-        sensitiveNodes,
-        node =>
+List<SanitizationTarget> targets = planner.Plan(
+    sensitiveNodes,
+    node =>
+    {
+        if (!mapper.TryGetSyntaxNode(node, out SyntaxNode? syntaxNode))
         {
-            if (
-                !mapper.TryGetSyntaxNode(
-                    node,
-                    out SyntaxNode? syntaxNode
-                )
-            )
-            {
-                return null;
-            }
-
-            if (
-                syntaxNode
-                    is not VariableDeclaratorSyntax variableNode
-            )
-            {
-                return null;
-            }
-
-            if (variableNode.Initializer is null)
-            {
-                return null;
-            }
-
-            ExpressionSyntax initializer =
-                variableNode.Initializer.Value;
-
-            return new SanitizationTarget
-            {
-                NodeId = node.Id,
-
-                NodeType = node.Type,
-
-                FilePath =
-                    syntaxNode.SyntaxTree.FilePath,
-
-                Start =
-                    initializer.Span.Start,
-
-                Length =
-                    initializer.Span.Length,
-
-                OriginalText =
-                    initializer.ToFullString(),
-            };
+            return null;
         }
-    );
+
+        if (syntaxNode is not VariableDeclaratorSyntax variableNode)
+        {
+            return null;
+        }
+
+        if (variableNode.Initializer is null)
+        {
+            return null;
+        }
+
+        ExpressionSyntax initializer = variableNode.Initializer.Value;
+
+        return new SanitizationTarget
+        {
+            NodeId = node.Id,
+
+            NodeType = node.Type,
+
+            FilePath = syntaxNode.SyntaxTree.FilePath,
+
+            Start = initializer.Span.Start,
+
+            Length = initializer.Span.Length,
+
+            OriginalText = initializer.ToFullString(),
+        };
+    }
+);
 
 Console.WriteLine();
-Console.WriteLine(
-    "SANITIZATION TARGETS"
-);
+Console.WriteLine("SANITIZATION TARGETS");
 
 foreach (SanitizationTarget target in targets)
 {
-    Console.WriteLine(
-        $"{target.NodeType} : {target.NodeId}"
-    );
+    Console.WriteLine($"{target.NodeType} : {target.NodeId}");
 
-    Console.WriteLine(
-        $"  File: {target.FilePath}"
-    );
+    Console.WriteLine($"  File: {target.FilePath}");
 
-    Console.WriteLine(
-        $"  Start: {target.Start}"
-    );
+    Console.WriteLine($"  Start: {target.Start}");
 
-    Console.WriteLine(
-        $"  Length: {target.Length}"
-    );
+    Console.WriteLine($"  Length: {target.Length}");
 
-    Console.WriteLine(
-        $"  Original: {target.OriginalText}"
-    );
+    Console.WriteLine($"  Original: {target.OriginalText}");
 }
 
 /*
  * ============================================================
- * SANITIZATION
+ * SANITIZATION + SESSION EXPORT
  * ============================================================
  */
 
-DummyValueGenerator dummyValueGenerator =
-    new();
+DummyValueGenerator dummyValueGenerator = new();
 
-SourceSanitizer sourceSanitizer =
-    new();
+SourceSanitizer sourceSanitizer = new();
 
-Dictionary<string, List<SanitizationTarget>> targetsByFile =
-    targets
-        .GroupBy(
-            target => target.FilePath
-        )
-        .ToDictionary(
-            group => group.Key,
-            group => group.ToList()
-        );
+SourceHasher sourceHasher = new();
 
-foreach (
-    (
-        string filePath,
-        List<SanitizationTarget> fileTargets
-    )
-    in targetsByFile
-)
+Dictionary<string, List<SanitizationTarget>> targetsByFile = targets
+    .GroupBy(target => target.FilePath)
+    .ToDictionary(group => group.Key, group => group.ToList());
+
+string sessionId = Guid.NewGuid().ToString("N");
+
+string sessionDirectory = Path.Combine(projectPath, ".aegis", "sessions", sessionId);
+
+string sanitizedDirectory = Path.Combine(sessionDirectory, "sanitized");
+
+string baselineDirectory = Path.Combine(sessionDirectory, "baseline");
+
+Directory.CreateDirectory(sanitizedDirectory);
+
+Directory.CreateDirectory(baselineDirectory);
+
+List<SessionFile> sessionFiles = [];
+
+foreach ((string filePath, List<SanitizationTarget> fileTargets) in targetsByFile)
 {
-    string source =
-        File.ReadAllText(filePath);
+    string source = File.ReadAllText(filePath);
 
-    List<SanitizationMapping> mappings =
-        sourceSanitizer.Sanitize(
-            source,
-            fileTargets,
-            target =>
+    string originalSourceHash = sourceHasher.Compute(source);
+
+    List<SanitizationMapping> mappings = sourceSanitizer.Sanitize(
+        source,
+        fileTargets,
+        target =>
+        {
+            return dummyValueGenerator.Generate(
+                target.OriginalText,
+                GetNodeName(target.NodeId, pirPackage)
+            );
+        },
+        out string sanitizedSource
+    );
+
+    string sanitizedSourceHash = sourceHasher.Compute(sanitizedSource);
+
+    string relativeFilePath = Path.GetRelativePath(projectPath, filePath);
+
+    string sanitizedFilePath = Path.Combine(sanitizedDirectory, relativeFilePath);
+
+    string baselineSanitizedFilePath = Path.Combine(baselineDirectory, relativeFilePath);
+
+    string? sanitizedFileDirectory = Path.GetDirectoryName(sanitizedFilePath);
+
+    if (!string.IsNullOrWhiteSpace(sanitizedFileDirectory))
+    {
+        Directory.CreateDirectory(sanitizedFileDirectory);
+    }
+
+    string? baselineFileDirectory = Path.GetDirectoryName(baselineSanitizedFilePath);
+
+    if (!string.IsNullOrWhiteSpace(baselineFileDirectory))
+    {
+        Directory.CreateDirectory(baselineFileDirectory);
+    }
+
+    File.WriteAllText(sanitizedFilePath, sanitizedSource);
+
+    File.WriteAllText(baselineSanitizedFilePath, sanitizedSource);
+
+    List<SessionMapping> sessionMappings = mappings
+        .Select(mapping =>
+        {
+            PirNode? node = pirPackage.Nodes.FirstOrDefault(candidate =>
+                candidate.Id == mapping.NodeId
+            );
+
+            if (node is null)
             {
-                return dummyValueGenerator.Generate(
-                    target.OriginalText,
-                    GetNodeName(
-                        target.NodeId,
-                        pirPackage
-                    )
+                throw new InvalidOperationException(
+                    "Could not resolve PIR node for " + $"sanitization mapping: {mapping.NodeId}"
                 );
-            },
-            out string sanitizedSource
-        );
+            }
+
+            return new SessionMapping
+            {
+                NodeId = mapping.NodeId,
+                NodeType = node.Type,
+                OriginalText = mapping.OriginalText,
+                DummyText = mapping.DummyText,
+                OriginalStart = mapping.OriginalStart,
+                OriginalLength = mapping.OriginalLength,
+                SanitizedStart = mapping.SanitizedStart,
+                SanitizedLength = mapping.SanitizedLength,
+            };
+        })
+        .ToList();
+
+    sessionFiles.Add(
+        new SessionFile
+        {
+            OriginalFilePath = filePath,
+            SanitizedFilePath = sanitizedFilePath,
+            BaselineSanitizedFilePath = baselineSanitizedFilePath,
+            OriginalSourceHash = originalSourceHash,
+            SanitizedSourceHash = sanitizedSourceHash,
+            Mappings = sessionMappings,
+        }
+    );
 
     Console.WriteLine();
-    Console.WriteLine(
-        "SANITIZED SOURCE"
-    );
+    Console.WriteLine("SANITIZED FILE");
 
-    Console.WriteLine(
-        sanitizedSource
-    );
+    Console.WriteLine($"Original:  {filePath}");
 
-    Console.WriteLine();
-    Console.WriteLine(
-        "SANITIZED CHANGES"
-    );
+    Console.WriteLine($"Sanitized: {sanitizedFilePath}");
 
-    /*
-     * ========================================================
-     * TEMPORARY LLM SIMULATION
-     * ========================================================
-     *
-     * This remains a test harness.
-     *
-     * We will replace this with actual external LLM output
-     * after the local round-trip pipeline is stable.
-     */
+    Console.WriteLine($"Original SHA-256:  {originalSourceHash}");
 
-    SanitizedChangeDetector changeDetector =
-        new();
+    Console.WriteLine($"Sanitized SHA-256: {sanitizedSourceHash}");
 
-    string modifiedSanitizedSource =
-        sanitizedSource
-            .Replace(
-                "string token = password;",
-                "string token = Hash(password);"
-            )
-            .Replace(
-                "string backup = token;",
-                "string backup = Encrypt(token);"
-            )
-            .Replace(
-                "private string password = \"DUMMY_PASSWORD\";",
-                "private string password = Hash(\"DUMMY_PASSWORD\");"
-            );
-
-    List<SanitizedChange> changes =
-        changeDetector.Detect(
-            sanitizedSource,
-            modifiedSanitizedSource,
-            filePath
-        );
-
-    ReverseMapper reverseMapper =
-        new();
-
-    List<ReverseMappedChange> reverseResults =
-        reverseMapper.Analyze(
-            changes,
-            mappings
-        );
+    Console.WriteLine($"Mappings: {sessionMappings.Count}");
 
     Console.WriteLine();
-    Console.WriteLine(
-        "REVERSE MAPPING ANALYSIS"
-    );
+    Console.WriteLine("SANITIZED SOURCE");
 
-    foreach (ReverseMappedChange result in reverseResults)
-    {
-        SanitizedChange change =
-            result.SourceChange;
-
-        Console.WriteLine(
-            $"Start: {change.Start}"
-        );
-
-        Console.WriteLine(
-            $"Original: {change.OriginalText}"
-        );
-
-        Console.WriteLine(
-            $"New: {change.NewText}"
-        );
-
-        Console.WriteLine(
-            $"Safe: {result.IsSafe}"
-        );
-
-        foreach (ProtectedRegion region in result.ProtectedRegions)
-        {
-            Console.WriteLine(
-                $"  Protected Region: "
-                + $"Start={region.Start}, "
-                + $"Length={region.Length}"
-            );
-
-            Console.WriteLine(
-                $"  Dummy: {region.DummyText}"
-            );
-
-            Console.WriteLine(
-                $"  Real: {region.OriginalText}"
-            );
-
-            Console.WriteLine(
-                $"  Node ID: {region.NodeId}"
-            );
-        }
-
-        if (result.Reason is not null)
-        {
-            Console.WriteLine(
-                $"Reason: {result.Reason}"
-            );
-        }
-
-        Console.WriteLine();
-    }
-
-    /*
-     * ========================================================
-     * REVERSE PATCH
-     * ========================================================
-     */
-
-    PatchValidator patchValidator =
-        new();
-
-    Console.WriteLine();
-    Console.WriteLine(
-        "REVERSE PATCH CANDIDATES"
-    );
-
-    foreach (ReverseMappedChange result in reverseResults)
-    {
-        ReversePatch? patch =
-            reverseMapper.CreatePatch(
-                result,
-                mappings,
-                source
-            );
-
-        if (patch is null)
-        {
-            continue;
-        }
-
-        Console.WriteLine(
-            $"File: {patch.FilePath}"
-        );
-
-        Console.WriteLine(
-            $"Start: {patch.Start}"
-        );
-
-        Console.WriteLine(
-            $"Original: {patch.OriginalText}"
-        );
-
-        Console.WriteLine(
-            $"Replacement: {patch.ReplacementText}"
-        );
-
-        Console.WriteLine(
-            $"Requires Review: {patch.RequiresReview}"
-        );
-
-        Console.WriteLine(
-            $"Reason: {patch.Reason}"
-        );
-
-        if (patch.RequiresReview)
-        {
-            Console.WriteLine(
-                "Validation: SKIPPED — requires review."
-            );
-
-            Console.WriteLine();
-
-            continue;
-        }
-
-        string originalSource =
-            File.ReadAllText(
-                patch.FilePath
-            );
-
-        PatchValidationResult validation =
-            patchValidator.Validate(
-                originalSource,
-                patch
-            );
-
-        Console.WriteLine(
-            $"Validation: "
-            + $"{(validation.IsValid ? "PASSED" : "FAILED")}"
-        );
-
-        foreach (string diagnostic in validation.Diagnostics)
-        {
-            Console.WriteLine(
-                $"  {diagnostic}"
-            );
-        }
-
-        Console.WriteLine();
-    }
+    Console.WriteLine(sanitizedSource);
 }
+
+if (sessionFiles.Count == 0)
+{
+    Console.WriteLine();
+    Console.WriteLine("No sanitization targets were found.");
+
+    return;
+}
+
+AegisSession session = new()
+{
+    Version = 1,
+    SessionId = sessionId,
+    Files = sessionFiles,
+};
+
+string sessionFilePath = Path.Combine(sessionDirectory, "session.json");
+
+SessionStore sessionStore = new();
+
+sessionStore.Save(session, sessionFilePath);
+
+Console.WriteLine();
+Console.WriteLine("============================================================");
+
+Console.WriteLine("AEGIS SESSION CREATED");
+
+Console.WriteLine("============================================================");
+
+Console.WriteLine($"Session ID: {sessionId}");
+
+Console.WriteLine($"Session:    {sessionFilePath}");
+
+Console.WriteLine($"Sanitized:  {sanitizedDirectory}");
+
+Console.WriteLine(
+    $"Baseline:   {baselineDirectory}"
+);
+
+Console.WriteLine();
+Console.WriteLine("The sanitized files can now be sent to any external LLM.");
+
+Console.WriteLine("Bring the modified sanitized files back to Aegis " + "for reverse mapping.");
 
 /*
  * ============================================================
@@ -838,15 +604,9 @@ foreach (
  * ============================================================
  */
 
-static string GetNodeName(
-    string nodeId,
-    PirPackage pirPackage
-)
+static string GetNodeName(string nodeId, PirPackage pirPackage)
 {
-    PirNode? node =
-        pirPackage.Nodes.FirstOrDefault(
-            node => node.Id == nodeId
-        );
+    PirNode? node = pirPackage.Nodes.FirstOrDefault(node => node.Id == nodeId);
 
     return node?.Name ?? "";
 }

@@ -117,4 +117,20 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# .NET build output
+**/bin/
+**/obj/
+
+# .NET user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+
+# Rider
+.idea/
+
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Node
