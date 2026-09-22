@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\packages\sanitizer\Sanitizer.csproj" />
+    <ProjectReference Include="..\..\apps\roslyn-worker\RoslynWorker.csproj" />
   </ItemGroup>
 
 </Project>
