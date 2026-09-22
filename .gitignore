@@ -133,4 +133,9 @@ dist
 # Rider
 .idea/
 
+# Aegis local session data
+.aegis/
+
+
+
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Node

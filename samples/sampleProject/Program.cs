@@ -6,7 +6,7 @@ public class AuthService
 
     public void Login()
     {
-        string token = password;
+        string token = Hash(password);
         string backup = token;
 
         Validate();
