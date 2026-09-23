@@ -987,37 +987,61 @@ public class RoslynToPirMapper
                 continue;
             }
 
-            ISymbol? sourceSymbol = semanticModel.GetSymbolInfo(variable.Initializer.Value).Symbol;
-
             ISymbol? targetSymbol = semanticModel.GetDeclaredSymbol(variable);
 
-            PirNode? sourceNode = null;
-
-            if (sourceSymbol is ILocalSymbol)
+            if (targetSymbol is null)
             {
-                localSymbolLookup.TryGetValue(sourceSymbol, out sourceNode);
-            }
-            else
-            {
-                sourceNode = FindPirNode(sourceSymbol);
+                continue;
             }
 
             PirNode? targetNode = null;
 
-            if (targetSymbol is not null)
+            if (targetSymbol is ILocalSymbol)
             {
                 localSymbolLookup.TryGetValue(targetSymbol, out targetNode);
             }
 
-            if (sourceNode is null || targetNode is null)
+            if (targetNode is null)
             {
-                // Console.WriteLine("FLOW NOT CREATED");
                 continue;
             }
 
-            // Console.WriteLine("FLOW CREATED");
+            foreach (
+                IdentifierNameSyntax identifier in variable
+                    .Initializer.Value.DescendantNodesAndSelf()
+                    .OfType<IdentifierNameSyntax>()
+            )
+            {
+                ISymbol? sourceSymbol = semanticModel.GetSymbolInfo(identifier).Symbol;
 
-            CreateRelationship(pirPackage, sourceNode, targetNode, PirRelationshipType.FLOWS_TO);
+                if (sourceSymbol is null)
+                {
+                    continue;
+                }
+
+                PirNode? sourceNode = null;
+
+                if (sourceSymbol is ILocalSymbol)
+                {
+                    localSymbolLookup.TryGetValue(sourceSymbol, out sourceNode);
+                }
+                else
+                {
+                    sourceNode = FindPirNode(sourceSymbol);
+                }
+
+                if (sourceNode is null)
+                {
+                    continue;
+                }
+
+                CreateRelationship(
+                    pirPackage,
+                    sourceNode,
+                    targetNode,
+                    PirRelationshipType.FLOWS_TO
+                );
+            }
         }
     }
 }

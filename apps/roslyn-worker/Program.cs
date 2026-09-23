@@ -233,15 +233,21 @@ static async Task Sanitize(string[] args)
         intrinsicResults.Add(sensitivityAnalyzer.Analyze(node));
     }
 
+    SensitivityPropagator sensitivityPropagator = new(graph, pirPackage);
+
+    Dictionary<string, SensitivityLevel> propagatedSensitivity = sensitivityPropagator.Propagate(
+        intrinsicResults
+    );
+
     ProgramSlice slice = graphAnalyzer.BuildDependencySlice(selectedNode, options);
 
     HashSet<string> sliceNodeIds = slice.Nodes.Select(node => node.Id).ToHashSet();
 
-    List<PirNode> sensitiveNodes = intrinsicResults
-        .Where(result =>
-            result.Level >= SensitivityLevel.Sensitive && sliceNodeIds.Contains(result.Node.Id)
+    List<PirNode> sensitiveNodes = slice
+        .Nodes.Where(node =>
+            propagatedSensitivity.TryGetValue(node.Id, out SensitivityLevel level)
+            && level >= SensitivityLevel.Sensitive
         )
-        .Select(result => result.Node)
         .ToList();
 
     SanitizationPlanner planner = new();
@@ -408,6 +414,8 @@ static async Task Sanitize(string[] args)
 
     sessionStore.Save(session, sessionFilePath);
 
+    WriteSessionReadme(sessionDirectory, session);
+
     Console.WriteLine("Aegis session created.");
 
     Console.WriteLine($"Session:   {sessionFilePath}");
@@ -560,4 +568,45 @@ static void PrintUsage()
     Console.WriteLine("  RoslynWorker sanitize <project-folder> <file-path> <start> <length>");
 
     Console.WriteLine("  RoslynWorker import <session.json>");
+}
+
+static void WriteSessionReadme(string sessionDirectory, AegisSession session)
+{
+    string readmePath = Path.Combine(sessionDirectory, "README.md");
+
+    string sessionFilePath = Path.Combine(sessionDirectory, "session.json");
+
+    List<string> lines =
+    [
+        "# Aegis Sanitized Session",
+        "",
+        $"Session ID: `{session.SessionId}`",
+        "",
+        "## What to do",
+        "",
+        "1. Review the sanitized files in the `sanitized` directory.",
+        "2. Send the sanitized source to your preferred LLM.",
+        "3. Ask the LLM to make the desired changes.",
+        "4. Apply the requested changes to the sanitized files.",
+        "5. Import the modified session with:",
+        "",
+        "```bash",
+        $"aegis import \"{sessionFilePath}\"",
+        "```",
+        "",
+        "Aegis will validate the changes before modifying the original source files.",
+        "",
+        "## Files",
+        "",
+    ];
+
+    foreach (SessionFile file in session.Files)
+    {
+        lines.Add($"- `{Path.GetFileName(file.SanitizedFilePath)}`");
+    }
+
+    lines.Add("");
+    lines.Add("Do not place original sensitive values into the sanitized files.");
+
+    File.WriteAllLines(readmePath, lines);
 }
