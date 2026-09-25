@@ -26,6 +26,9 @@ switch (command)
     case "sanitize":
         await Sanitize(args);
         break;
+    case "apply":
+        Apply(args);
+        break;
 
     case "import":
         Import(args);
@@ -538,6 +541,46 @@ static async Task Sanitize(string[] args)
     Console.WriteLine($"     aegis import \"{sessionFilePath}\"");
 }
 
+static void Apply(string[] args)
+{
+    string projectPath =
+        args.Length >= 2 ? Path.GetFullPath(args[1]) : Directory.GetCurrentDirectory();
+
+    Console.WriteLine($"Project: {projectPath}");
+
+    string sessionsDirectory = Path.Combine(projectPath, ".aegis", "sessions");
+
+    Console.WriteLine($"Sessions: {sessionsDirectory}");
+
+    if (!Directory.Exists(sessionsDirectory))
+    {
+        Console.WriteLine("No Aegis sessions found.");
+        return;
+    }
+
+    string[] sessionFiles = Directory.GetFiles(
+        sessionsDirectory,
+        "session.json",
+        SearchOption.AllDirectories
+    );
+
+    if (sessionFiles.Length == 0)
+    {
+        Console.WriteLine("No Aegis sessions found.");
+        return;
+    }
+
+    if (sessionFiles.Length > 1)
+    {
+        Console.WriteLine("Multiple Aegis sessions found.");
+        Console.WriteLine("The alpha requires exactly one session.");
+        return;
+    }
+
+    Console.WriteLine($"Applying session: {sessionFiles[0]}");
+
+    Import(["import", sessionFiles[0]]);
+}
 static void Import(string[] args)
 {
     if (args.Length < 2)

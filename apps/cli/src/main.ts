@@ -13,14 +13,21 @@ if (args.length === 0) {
 const command = args[0];
 
 switch (command) {
-    case "sanitize":
-        validateSanitizeArgs(args);
-        await runWorker(args);
+    case "protect":
+        validateProtectArgs(args);
+        await runWorker([
+            "sanitize",
+            process.cwd(),
+            path.resolve(process.cwd(), args[1]!),
+        ]);
         break;
 
-    case "import":
-        validateImportArgs(args);
-        await runWorker(args);
+    case "apply":
+        await runApply();
+        break;
+
+    case "status":
+        await runStatus();
         break;
 
     case "help":
@@ -36,58 +43,64 @@ switch (command) {
         process.exit(1);
 }
 
-function validateSanitizeArgs(args: string[]): void {
-    // Human-friendly mode:
-    // aegis sanitize <project-folder> <file-path>
-    if (args.length === 3) {
+function validateProtectArgs(args: string[]): void {
+    if (args.length !== 2) {
+        console.error("Usage: aegis protect <file>");
+        process.exit(1);
+    }
+}
+
+async function runApply(): Promise<void> {
+    await runWorker([
+        "apply",
+        process.cwd(),
+    ]);
+}
+
+async function runStatus(): Promise<void> {
+    const sessionPath = findActiveSession();
+
+    if (sessionPath === null) {
+        console.log("Aegis");
+        console.log("");
+        console.log("No active session.");
+        console.log("");
+        console.log("Start with:");
+        console.log("");
+        console.log("  aegis protect <file>");
         return;
     }
 
-    // Precise mode:
-    // aegis sanitize <project-folder> <file-path> <start> <length>
-    if (args.length !== 5) {
-        console.error(
-            "Invalid arguments for sanitize."
-        );
-        console.error("");
-        console.error(
-            "Usage: aegis sanitize <project-folder> <file-path> [<start> <length>]"
-        );
-        process.exit(1);
-    }
-
-    const start = Number(args[3]);
-    const length = Number(args[4]);
-
-    if (!Number.isInteger(start) || start < 0) {
-        console.error(
-            "Selection start must be a non-negative integer."
-        );
-        process.exit(1);
-    }
-
-    if (!Number.isInteger(length) || length < 0) {
-        console.error(
-            "Selection length must be a non-negative integer."
-        );
-        process.exit(1);
-    }
+    console.log("Aegis");
+    console.log("");
+    console.log(`Active session: ${sessionPath}`);
 }
 
-function validateImportArgs(args: string[]): void {
-    if (args.length !== 2) {
-        console.error(
-            "Invalid arguments for import."
-        );
-        console.error("");
-        console.error(
-            "Usage: aegis import <session.json>"
-        );
-        process.exit(1);
-    }
+function findActiveSession(): string | null {
+    const aegisDirectory = path.join(
+        process.cwd(),
+        ".aegis",
+        "sessions"
+    );
+
+    return findReadySession(aegisDirectory);
 }
 
-function runWorker(args: string[]): Promise<void> {
+function findReadySession(directory: string): string | null {
+    // Temporary implementation.
+    //
+    // Session discovery will be moved into the worker once
+    // the public CLI flow is stable.
+    //
+    // For now, the CLI will not guess between multiple sessions.
+
+    return null;
+}
+
+function runWorker(
+    args: string[],
+    workingDirectory?: string
+): Promise<void> {
     return new Promise((resolve, reject) => {
         const repoRoot = path.resolve(
             import.meta.dirname,
@@ -111,7 +124,7 @@ function runWorker(args: string[]): Promise<void> {
                 ...args,
             ],
             {
-                cwd: repoRoot,
+                cwd: workingDirectory ?? repoRoot,
                 stdio: "inherit",
             }
         );
@@ -140,33 +153,15 @@ Privacy infrastructure for AI-assisted software development.
 
 Usage:
 
-  aegis sanitize <project-folder> <file-path> [<start> <length>]
-
-      Create a sanitized Aegis session.
-
-      Without <start> and <length>, Aegis will
-      ask you to select the source lines interactively.
-
-  aegis import <session.json>
-
-      Import a modified sanitized source and apply safe changes.
-
-  aegis help
-
-      Show this help message.
+  aegis protect <file>     Protect code before sending it to an LLM
+  aegis apply              Apply safe LLM changes back to your code
+  aegis status             Show the current Aegis session
+  aegis help               Show this help
 
 Examples:
 
-  Interactive selection:
-
-    aegis sanitize ./samples/sampleProject ./samples/sampleProject/Program.cs
-
-  Precise selection:
-
-    aegis sanitize ./samples/sampleProject ./samples/sampleProject/Program.cs 194 30
-
-  Import:
-
-    aegis import ./samples/sampleProject/.aegis/sessions/<session-id>/session.json
+  aegis protect src/AuthService.cs
+  aegis apply
+  aegis status
 `);
 }
