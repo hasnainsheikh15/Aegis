@@ -37,13 +37,21 @@ switch (command) {
 }
 
 function validateSanitizeArgs(args: string[]): void {
+    // Human-friendly mode:
+    // aegis sanitize <project-folder> <file-path>
+    if (args.length === 3) {
+        return;
+    }
+
+    // Precise mode:
+    // aegis sanitize <project-folder> <file-path> <start> <length>
     if (args.length !== 5) {
         console.error(
             "Invalid arguments for sanitize."
         );
         console.error("");
         console.error(
-            "Usage: aegis sanitize <project-folder> <file-path> <start> <length>"
+            "Usage: aegis sanitize <project-folder> <file-path> [<start> <length>]"
         );
         process.exit(1);
     }
@@ -132,9 +140,12 @@ Privacy infrastructure for AI-assisted software development.
 
 Usage:
 
-  aegis sanitize <project-folder> <file-path> <start> <length>
+  aegis sanitize <project-folder> <file-path> [<start> <length>]
 
       Create a sanitized Aegis session.
+
+      Without <start> and <length>, Aegis will
+      ask you to select the source lines interactively.
 
   aegis import <session.json>
 
@@ -146,8 +157,16 @@ Usage:
 
 Examples:
 
-  aegis sanitize ./samples/sampleProject ./samples/sampleProject/Program.cs 194 30
+  Interactive selection:
 
-  aegis import ./samples/sampleProject/.aegis/sessions/<session-id>/session.json
+    aegis sanitize ./samples/sampleProject ./samples/sampleProject/Program.cs
+
+  Precise selection:
+
+    aegis sanitize ./samples/sampleProject ./samples/sampleProject/Program.cs 194 30
+
+  Import:
+
+    aegis import ./samples/sampleProject/.aegis/sessions/<session-id>/session.json
 `);
 }

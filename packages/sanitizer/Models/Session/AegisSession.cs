@@ -7,4 +7,6 @@ public sealed class AegisSession
     public required string SessionId { get; init; }
 
     public required List<SessionFile> Files { get; init; }
+
+    public SessionStatus Status { get; set; } = SessionStatus.Ready;
 }

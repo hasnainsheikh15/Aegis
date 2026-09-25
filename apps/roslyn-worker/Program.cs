@@ -40,15 +40,25 @@ switch (command)
 
 static async Task Sanitize(string[] args)
 {
-    if (args.Length < 5)
+    if (args.Length < 3)
     {
         Console.WriteLine(
-            "Usage: RoslynWorker sanitize <project-folder> <file-path> <start> <length>"
+            "Usage: RoslynWorker sanitize <project-folder> <file-path> [<start> <length>]"
         );
 
         return;
     }
 
+    bool interactiveSelection = args.Length == 3;
+
+    if (!interactiveSelection && args.Length < 5)
+    {
+        Console.WriteLine(
+            "Usage: RoslynWorker sanitize <project-folder> <file-path> [<start> <length>]"
+        );
+
+        return;
+    }
     string projectPath = Path.GetFullPath(args[1]);
     string selectedFilePath = Path.GetFullPath(args[2]);
 
@@ -66,18 +76,80 @@ static async Task Sanitize(string[] args)
         return;
     }
 
-    if (!int.TryParse(args[3], out int selectionStart))
-    {
-        Console.WriteLine("Selection start must be an integer.");
+    int selectionStart;
+    int selectionLength;
 
-        return;
+    if (interactiveSelection)
+    {
+        string source = File.ReadAllText(selectedFilePath);
+
+        string[] lines = source.Split('\n');
+
+        Console.WriteLine();
+        Console.WriteLine($"File: {selectedFilePath}");
+        Console.WriteLine();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            Console.WriteLine($"{i + 1, 4} | {lines[i].TrimEnd('\r')}");
+        }
+
+        Console.WriteLine();
+
+        Console.Write("Start line: ");
+
+        if (!int.TryParse(Console.ReadLine(), out int startLine))
+        {
+            Console.WriteLine("Start line must be an integer.");
+            return;
+        }
+
+        Console.Write("End line: ");
+
+        if (!int.TryParse(Console.ReadLine(), out int endLine))
+        {
+            Console.WriteLine("End line must be an integer.");
+            return;
+        }
+
+        if (startLine < 1 || endLine < startLine || endLine > lines.Length)
+        {
+            Console.WriteLine("Invalid line range.");
+            return;
+        }
+
+        selectionStart = 0;
+
+        for (int i = 0; i < startLine - 1; i++)
+        {
+            selectionStart += lines[i].Length + 1;
+        }
+
+        selectionLength = 0;
+
+        for (int i = startLine - 1; i < endLine; i++)
+        {
+            selectionLength += lines[i].Length;
+
+            if (i < endLine - 1)
+            {
+                selectionLength += 1;
+            }
+        }
     }
-
-    if (!int.TryParse(args[4], out int selectionLength))
+    else
     {
-        Console.WriteLine("Selection length must be an integer.");
+        if (!int.TryParse(args[3], out selectionStart))
+        {
+            Console.WriteLine("Selection start must be an integer.");
+            return;
+        }
 
-        return;
+        if (!int.TryParse(args[4], out selectionLength))
+        {
+            Console.WriteLine("Selection length must be an integer.");
+            return;
+        }
     }
 
     if (selectionStart < 0)
@@ -183,30 +255,39 @@ static async Task Sanitize(string[] args)
 
     SelectionResolver selectionResolver = new();
 
-    List<PirNode> selectedNodes = selectionResolver.Resolve(
-        selectedSyntaxTree,
-        selectedSemanticModel,
-        selection,
-        mapper
-    );
+    List<PirNode> selectedNodes;
+
+    if (interactiveSelection)
+    {
+        selectedNodes = selectionResolver.ResolveRange(selectedSyntaxTree, selection, mapper);
+    }
+    else
+    {
+        selectedNodes = selectionResolver.Resolve(
+            selectedSyntaxTree,
+            selectedSemanticModel,
+            selection,
+            mapper
+        );
+    }
 
     if (selectedNodes.Count == 0)
     {
-        Console.WriteLine("No PIR node could be resolved from the selection.");
+        Console.WriteLine("No PIR nodes could be resolved from the selection.");
 
         return;
     }
 
-    if (selectedNodes.Count > 1)
+    if (!interactiveSelection && selectedNodes.Count > 1)
     {
         Console.WriteLine("Selection resolved to multiple PIR nodes.");
 
-        Console.WriteLine("The alpha currently requires exactly one selected node.");
+        Console.WriteLine(
+            "The precise selection mode currently requires exactly one selected node."
+        );
 
         return;
     }
-
-    PirNode selectedNode = selectedNodes[0];
 
     PirGraph graph = new(pirPackage);
 
@@ -239,16 +320,30 @@ static async Task Sanitize(string[] args)
         intrinsicResults
     );
 
-    ProgramSlice slice = graphAnalyzer.BuildDependencySlice(selectedNode, options);
+    List<PirNode> sensitiveNodes;
 
-    HashSet<string> sliceNodeIds = slice.Nodes.Select(node => node.Id).ToHashSet();
+    if (interactiveSelection)
+    {
+        sensitiveNodes = selectedNodes
+            .Where(node =>
+                propagatedSensitivity.TryGetValue(node.Id, out SensitivityLevel level)
+                && level >= SensitivityLevel.Sensitive
+            )
+            .ToList();
+    }
+    else
+    {
+        PirNode selectedNode = selectedNodes[0];
 
-    List<PirNode> sensitiveNodes = slice
-        .Nodes.Where(node =>
-            propagatedSensitivity.TryGetValue(node.Id, out SensitivityLevel level)
-            && level >= SensitivityLevel.Sensitive
-        )
-        .ToList();
+        ProgramSlice slice = graphAnalyzer.BuildDependencySlice(selectedNode, options);
+
+        sensitiveNodes = slice
+            .Nodes.Where(node =>
+                propagatedSensitivity.TryGetValue(node.Id, out SensitivityLevel level)
+                && level >= SensitivityLevel.Sensitive
+            )
+            .ToList();
+    }
 
     SanitizationPlanner planner = new();
 
@@ -463,6 +558,15 @@ static void Import(string[] args)
 
     SessionStore sessionStore = new();
 
+    AegisSession session = sessionStore.Load(sessionFilePath);
+
+    if (session.Status == SessionStatus.Consumed)
+    {
+        Console.WriteLine("Session has already been consumed.");
+
+        return;
+    }
+
     SessionImporter importer = new(
         sessionStore,
         new SourceHasher(),
@@ -513,15 +617,13 @@ static void Import(string[] args)
 
         hadChanges = true;
 
-        SessionFile? sessionFile = sessionStore
-            .Load(sessionFilePath)
-            .Files.FirstOrDefault(file =>
-                string.Equals(
-                    file.OriginalFilePath,
-                    fileResult.OriginalFilePath,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            );
+        SessionFile? sessionFile = session.Files.FirstOrDefault(file =>
+            string.Equals(
+                file.OriginalFilePath,
+                fileResult.OriginalFilePath,
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
 
         if (sessionFile is null)
         {
@@ -557,6 +659,7 @@ static void Import(string[] args)
 
         Console.WriteLine($"Applied: {fileResult.OriginalFilePath}");
     }
+
     if (!hadChanges)
     {
         Console.WriteLine("No changes were detected.");
@@ -570,6 +673,13 @@ static void Import(string[] args)
 
         return;
     }
+
+    // Every file was processed successfully.
+    session.Status = SessionStatus.Consumed;
+
+    sessionStore.Save(session, sessionFilePath);
+
+    Console.WriteLine("Session marked as consumed.");
 
     Console.WriteLine("Import completed successfully.");
 }
@@ -602,19 +712,41 @@ static void WriteSessionReadme(string sessionDirectory, AegisSession session)
         "",
         $"Session ID: `{session.SessionId}`",
         "",
-        "## What to do",
+        "## Purpose",
+        "",
+        "This session contains a sanitized copy of selected source code.",
+        "Sensitive values identified by Aegis have been replaced with dummy values.",
+        "",
+        "The original source remains outside this session.",
+        "",
+        "## Workflow",
         "",
         "1. Review the sanitized files in the `sanitized` directory.",
-        "2. Send the sanitized source to your preferred LLM.",
+        "2. Send the sanitized source to your preferred external LLM.",
         "3. Ask the LLM to make the desired changes.",
-        "4. Apply the requested changes to the sanitized files.",
-        "5. Import the modified session with:",
+        "4. Apply or paste the LLM's changes into the sanitized files.",
+        "5. Review the modified sanitized files.",
+        "6. Import the session with:",
         "",
         "```bash",
         $"aegis import \"{sessionFilePath}\"",
         "```",
         "",
-        "Aegis will validate the changes before modifying the original source files.",
+        "Aegis compares the modified sanitized source against the trusted baseline.",
+        "It then validates the changes before modifying the original source files.",
+        "",
+        "## Security rules",
+        "",
+        "- Do not place original sensitive values into the sanitized files.",
+        "- Do not replace, modify, duplicate, or move protected dummy values.",
+        "- Aegis may require manual review when a change cannot be safely mapped back.",
+        "- A session can be successfully imported only once.",
+        "- If the original source changes after the session is created, the import requires review.",
+        "",
+        "## If import requires review",
+        "",
+        "Aegis will not automatically apply an unsafe change to the original source.",
+        "Review the reported reason and inspect the proposed change manually.",
         "",
         "## Files",
         "",
@@ -626,7 +758,12 @@ static void WriteSessionReadme(string sessionDirectory, AegisSession session)
     }
 
     lines.Add("");
-    lines.Add("Do not place original sensitive values into the sanitized files.");
+    lines.Add(
+        "The `baseline` directory contains the trusted sanitized snapshot used for change detection."
+    );
+    lines.Add("");
+    lines.Add("The `session.json` file contains the session metadata and sanitization mappings.");
+    lines.Add("");
 
     File.WriteAllLines(readmePath, lines);
 }

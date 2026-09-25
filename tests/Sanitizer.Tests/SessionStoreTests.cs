@@ -23,6 +23,7 @@ public class SessionStoreTests
             {
                 Version = 1,
                 SessionId = "test-session",
+                Status = SessionStatus.Consumed,
                 Files =
                 [
                     new SessionFile
@@ -68,6 +69,8 @@ public class SessionStoreTests
             Assert.Equal(original.Version, loaded.Version);
 
             Assert.Equal(original.SessionId, loaded.SessionId);
+
+            Assert.Equal(original.Status, loaded.Status);
 
             Assert.Single(loaded.Files);
 
