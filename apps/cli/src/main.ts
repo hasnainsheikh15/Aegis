@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -167,31 +169,40 @@ async function runStatus(): Promise<void> {
 
 // ─── Worker communication ──────────────────────────────────────
 
+function getWorkerPath(): string {
+    const workerPath = path.join(
+        import.meta.dirname,
+        "..",
+        "worker",
+        "win-x64",
+        "RoslynWorker.exe"
+    );
+
+    if (!fs.existsSync(workerPath)) {
+        throw new Error(
+            `Aegis worker not found at:\n${workerPath}`
+        );
+    }
+
+    return workerPath;
+}
+
 function runWorker(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-        const repoRoot = path.resolve(
-            import.meta.dirname,
-            "../../.."
-        );
+        let workerPath: string;
 
-        const workerProject = path.join(
-            repoRoot,
-            "apps",
-            "roslyn-worker",
-            "RoslynWorker.csproj"
-        );
+        try {
+            workerPath = getWorkerPath();
+        } catch (error) {
+            reject(error);
+            return;
+        }
 
         const worker = spawn(
-            "dotnet",
-            [
-                "run",
-                "--project",
-                workerProject,
-                "--",
-                ...args,
-            ],
+            workerPath,
+            args,
             {
-                cwd: repoRoot,
+                cwd: process.cwd(),
                 stdio: "inherit",
             }
         );
@@ -215,32 +226,23 @@ function runWorker(args: string[]): Promise<void> {
 
 function runWorkerCapture(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-        const repoRoot = path.resolve(
-            import.meta.dirname,
-            "../../.."
-        );
+        let workerPath: string;
 
-        const workerProject = path.join(
-            repoRoot,
-            "apps",
-            "roslyn-worker",
-            "RoslynWorker.csproj"
-        );
+        try {
+            workerPath = getWorkerPath();
+        } catch (error) {
+            reject(error);
+            return;
+        }
 
         let stdout = "";
         let stderr = "";
 
         const worker = spawn(
-            "dotnet",
-            [
-                "run",
-                "--project",
-                workerProject,
-                "--",
-                ...args,
-            ],
+            workerPath,
+            args,
             {
-                cwd: repoRoot,
+                cwd: process.cwd(),
                 stdio: ["pipe", "pipe", "pipe"],
             }
         );
@@ -270,6 +272,10 @@ function runWorkerCapture(args: string[]): Promise<string> {
         });
     });
 }
+
+
+
+
 
 // ─── Output parsers ────────────────────────────────────────────
 

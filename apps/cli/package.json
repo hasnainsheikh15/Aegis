@@ -9,11 +9,15 @@
     "dev": "tsx src/main.ts"
   },
   "bin": {
-    "aegis": "dist/main.js"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "aegis": "dist/main.js"
+},
+"files": [
+  "dist",
+  "worker"
+],
+"engines": {
+  "node": ">=20"
+},
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@types/node": "^26.6.2",
