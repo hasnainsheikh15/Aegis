@@ -518,4 +518,289 @@ public void LLMReturnsRealSecret_RequiresReview()
      */
     Assert.True(patch.RequiresReview);
 }
+
+[Fact]
+public void ProtectedDummyModified_RequiresReview()
+{
+    string originalSource =
+        "string value = \"abc123\";\r\n";
+
+    string sanitizedSource =
+        "string value = \"DUMMY_PASSWORD\";\r\n";
+
+    string modifiedSanitizedSource =
+        "string value = \"DUMMY_PASSWORD_SALT\";\r\n";
+
+    SanitizationMapping mapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = 15,
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = 15,
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes = detector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        "Program.cs"
+    );
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(changes, [mapping]);
+
+    Assert.Single(analyzed);
+
+    ReversePatch? patch =
+        mapper.CreatePatch(
+            analyzed[0],
+            [mapping],
+            originalSource
+        );
+
+    Assert.NotNull(patch);
+    Assert.True(patch.RequiresReview);
+
+    Assert.Equal(
+        "string value = \"abc123\";\r\n",
+        patch.ReplacementText
+    );
+}
+
+
+[Fact]
+public void ProtectedDummyCopiedIntoNewLocation_RequiresReview()
+{
+    string originalSource =
+        "string password = \"abc123\";\r\n"
+        + "string token = password;\r\n";
+
+    string sanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string token = password;\r\n";
+
+    string modifiedSanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string token = password;\r\n"
+        + "string backup = \"DUMMY_PASSWORD\";\r\n";
+
+    SanitizationMapping mapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = originalSource.IndexOf("\"abc123\""),
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = sanitizedSource.IndexOf("\"DUMMY_PASSWORD\""),
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes = detector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        "Program.cs"
+    );
+
+    Assert.NotEmpty(changes);
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(changes, [mapping]);
+
+    Assert.Contains(
+        analyzed,
+        change => !change.IsSafe
+    );
+}
+[Fact]
+public void ProtectedDummyMovedToNewLocation_RequiresReview()
+{
+    string originalSource =
+        "string password = \"abc123\";\r\n"
+        + "string token = password;\r\n";
+
+    string sanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string token = password;\r\n";
+
+    string modifiedSanitizedSource =
+        "string password = \"REDACTED\";\r\n"
+        + "string token = password;\r\n"
+        + "string backup = \"DUMMY_PASSWORD\";\r\n";
+
+    SanitizationMapping mapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = originalSource.IndexOf("\"abc123\""),
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = sanitizedSource.IndexOf("\"DUMMY_PASSWORD\""),
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes = detector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        "Program.cs"
+    );
+
+    Assert.NotEmpty(changes);
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(changes, [mapping]);
+
+    Assert.Contains(
+        analyzed,
+        change => !change.IsSafe
+    );
+}
+
+[Fact]
+public void ProtectedDummyUsedInNewCode_RequiresReview()
+{
+    string originalSource =
+        "string password = \"abc123\";\r\n"
+        + "string token = password;\r\n";
+
+    string sanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string token = password;\r\n";
+
+    string modifiedSanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string token = password;\r\n"
+        + "Log(\"DUMMY_PASSWORD\");\r\n";
+
+    SanitizationMapping mapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = originalSource.IndexOf("\"abc123\""),
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = sanitizedSource.IndexOf("\"DUMMY_PASSWORD\""),
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes = detector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        "Program.cs"
+    );
+
+    Assert.NotEmpty(changes);
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(changes, [mapping]);
+
+    Assert.Contains(
+        analyzed,
+        change => !change.IsSafe
+    );
+}
+
+[Fact]
+public void UnrelatedChangeAfterMultipleProtectedValues_IsAutomaticallyPatchable()
+{
+    string originalSource =
+        "string password = \"abc123\";\r\n"
+        + "string apiKey = \"real-api-key\";\r\n"
+        + "string token = password;\r\n";
+
+    string sanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string apiKey = \"DUMMY_APIKEY\";\r\n"
+        + "string token = password;\r\n";
+
+    string modifiedSanitizedSource =
+        "string password = \"DUMMY_PASSWORD\";\r\n"
+        + "string apiKey = \"DUMMY_APIKEY\";\r\n"
+        + "string token = Hash(password);\r\n";
+
+    SanitizationMapping passwordMapping = new()
+    {
+        NodeId = "password-node",
+        OriginalText = "\"abc123\"",
+        DummyText = "\"DUMMY_PASSWORD\"",
+        FilePath = "Program.cs",
+        OriginalStart = originalSource.IndexOf("\"abc123\""),
+        OriginalLength = "\"abc123\"".Length,
+        SanitizedStart = sanitizedSource.IndexOf("\"DUMMY_PASSWORD\""),
+        SanitizedLength = "\"DUMMY_PASSWORD\"".Length,
+    };
+
+    SanitizationMapping apiKeyMapping = new()
+    {
+        NodeId = "api-key-node",
+        OriginalText = "\"real-api-key\"",
+        DummyText = "\"DUMMY_APIKEY\"",
+        FilePath = "Program.cs",
+        OriginalStart = originalSource.IndexOf("\"real-api-key\""),
+        OriginalLength = "\"real-api-key\"".Length,
+        SanitizedStart = sanitizedSource.IndexOf("\"DUMMY_APIKEY\""),
+        SanitizedLength = "\"DUMMY_APIKEY\"".Length,
+    };
+
+    SanitizedChangeDetector detector = new();
+
+    List<SanitizedChange> changes = detector.Detect(
+        sanitizedSource,
+        modifiedSanitizedSource,
+        "Program.cs"
+    );
+
+    ReverseMapper mapper = new();
+
+    List<ReverseMappedChange> analyzed =
+        mapper.Analyze(
+            changes,
+            [passwordMapping, apiKeyMapping]
+        );
+
+    Assert.Single(analyzed);
+
+    ReversePatch? patch =
+        mapper.CreatePatch(
+            analyzed[0],
+            [passwordMapping, apiKeyMapping],
+            originalSource
+        );
+
+    Assert.NotNull(patch);
+    Assert.False(patch.RequiresReview);
+
+    Assert.Equal(
+        "string token = password;\r\n",
+        patch.OriginalText
+    );
+
+    Assert.Equal(
+        "string token = Hash(password);\r\n",
+        patch.ReplacementText
+    );
+}
+
+
 }

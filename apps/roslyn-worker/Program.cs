@@ -273,14 +273,24 @@ static async Task Sanitize(string[] args)
 
             ExpressionSyntax initializer = variableNode.Initializer.Value;
 
+            LiteralExpressionSyntax? literal = initializer
+                .DescendantNodesAndSelf()
+                .OfType<LiteralExpressionSyntax>()
+                .FirstOrDefault(literal => literal.IsKind(SyntaxKind.StringLiteralExpression));
+
+            if (literal is null)
+            {
+                return null;
+            }
+
             return new SanitizationTarget
             {
                 NodeId = node.Id,
                 NodeType = node.Type,
                 FilePath = syntaxNode.SyntaxTree.FilePath,
-                Start = initializer.Span.Start,
-                Length = initializer.Span.Length,
-                OriginalText = initializer.ToFullString(),
+                Start = literal.Span.Start,
+                Length = literal.Span.Length,
+                OriginalText = literal.ToFullString(),
             };
         }
     );
@@ -416,11 +426,21 @@ static async Task Sanitize(string[] args)
 
     WriteSessionReadme(sessionDirectory, session);
 
+    string readmePath = Path.Combine(sessionDirectory, "README.md");
+
     Console.WriteLine("Aegis session created.");
-
+    Console.WriteLine();
     Console.WriteLine($"Session:   {sessionFilePath}");
-
     Console.WriteLine($"Sanitized: {sanitizedDirectory}");
+    Console.WriteLine($"README:    {readmePath}");
+    Console.WriteLine();
+    Console.WriteLine("Next:");
+    Console.WriteLine("  1. Review the sanitized files.");
+    Console.WriteLine("  2. Send the sanitized source to your preferred LLM.");
+    Console.WriteLine("  3. Modify the sanitized files with the requested changes.");
+    Console.WriteLine("  4. Run:");
+    Console.WriteLine();
+    Console.WriteLine($"     aegis import \"{sessionFilePath}\"");
 }
 
 static void Import(string[] args)

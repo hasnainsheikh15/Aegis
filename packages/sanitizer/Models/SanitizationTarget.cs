@@ -15,4 +15,8 @@ public sealed class SanitizationTarget
     public required int Length { get; init; }
 
     public required string OriginalText { get; init; }
+
+    public string? ProposedText { get; set; }
+
+    public bool HasChanges => ProposedText is not null && ProposedText != OriginalText;
 }

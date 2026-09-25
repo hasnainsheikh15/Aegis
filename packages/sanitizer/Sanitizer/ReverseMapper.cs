@@ -9,10 +9,9 @@ public sealed class ReverseMapper
         IEnumerable<SanitizationMapping> mappings
     )
     {
-        List<SanitizationMapping> mappingList =
-            mappings
-                .OrderBy(mapping => mapping.SanitizedStart)
-                .ToList();
+        List<SanitizationMapping> mappingList = mappings
+            .OrderBy(mapping => mapping.SanitizedStart)
+            .ToList();
 
         List<ReverseMappedChange> results = [];
 
@@ -22,11 +21,7 @@ public sealed class ReverseMapper
 
             foreach (SanitizationMapping mapping in mappingList)
             {
-                ProtectedRegion? region =
-                    FindProtectedRegion(
-                        change,
-                        mapping
-                    );
+                ProtectedRegion? region = FindProtectedRegion(change, mapping);
 
                 if (region is not null)
                 {
@@ -34,19 +29,41 @@ public sealed class ReverseMapper
                 }
             }
 
-            bool isProtected =
-                protectedRegions.Count > 0;
+            bool containsUnauthorizedDummy = ContainsDummyOutsideProtectedRegion(
+                change,
+                mappingList
+            );
+
+            bool isProtected = protectedRegions.Count > 0;
+
+            bool isSafe = !isProtected && !containsUnauthorizedDummy;
+
+            string? reason = null;
+
+            if (containsUnauthorizedDummy)
+            {
+                reason =
+                    "Change contains a protected dummy value "
+                    + "outside its original protected region.";
+            }
+            else if (isProtected)
+            {
+                reason = "Change contains a protected sanitized value.";
+            }
 
             results.Add(
                 new ReverseMappedChange
                 {
                     SourceChange = change,
-                    IsSafe = !isProtected,
+
+                    IsSafe = isSafe,
+
                     RealText = null,
+
                     ReplacementText = null,
-                    Reason = isProtected
-                        ? "Change contains a protected sanitized value."
-                        : null,
+
+                    Reason = reason,
+
                     ProtectedRegions = protectedRegions,
                 }
             );
@@ -61,24 +78,18 @@ public sealed class ReverseMapper
         string originalSource
     )
     {
-        SanitizedChange change =
-            mappedChange.SourceChange;
+        SanitizedChange change = mappedChange.SourceChange;
 
-        List<SanitizationMapping> mappingList =
-            mappings
-                .OrderBy(mapping => mapping.SanitizedStart)
-                .ToList();
+        List<SanitizationMapping> mappingList = mappings
+            .OrderBy(mapping => mapping.SanitizedStart)
+            .ToList();
 
         /*
          * Translate the beginning of the changed region from
          * sanitized-source coordinates to original-source
          * coordinates.
          */
-        int realStart =
-            TranslateSanitizedPositionToOriginal(
-                change.Start,
-                mappingList
-            );
+        int realStart = TranslateSanitizedPositionToOriginal(change.Start, mappingList);
 
         /*
          * Reconstruct exactly what existed in the original
@@ -92,17 +103,13 @@ public sealed class ReverseMapper
          */
         bool reconstructionFailed;
 
-        string? realOriginalText =
-            ReconstructOriginalText(
-                change,
-                mappingList,
-                out reconstructionFailed
-            );
+        string? realOriginalText = ReconstructOriginalText(
+            change,
+            mappingList,
+            out reconstructionFailed
+        );
 
-        if (
-            reconstructionFailed
-            || realOriginalText is null
-        )
+        if (reconstructionFailed || realOriginalText is null)
         {
             return new ReversePatch
             {
@@ -113,13 +120,11 @@ public sealed class ReverseMapper
                 ReplacementText = "",
                 RequiresReview = true,
                 Reason =
-                    "The changed region does not align safely "
-                    + "with the sanitization mappings."
+                    "The changed region does not align safely " + "with the sanitization mappings.",
             };
         }
 
-        int realLength =
-            realOriginalText.Length;
+        int realLength = realOriginalText.Length;
 
         /*
          * Verify that the calculated original range is valid.
@@ -138,8 +143,7 @@ public sealed class ReverseMapper
                 OriginalText = "",
                 ReplacementText = "",
                 RequiresReview = true,
-                Reason =
-                    "The reverse-mapped source range is invalid."
+                Reason = "The reverse-mapped source range is invalid.",
             };
         }
 
@@ -150,11 +154,7 @@ public sealed class ReverseMapper
          * MUST exactly equal the text currently present in the
          * original source.
          */
-        string sourceOriginalText =
-            originalSource.Substring(
-                realStart,
-                realLength
-            );
+        string sourceOriginalText = originalSource.Substring(realStart, realLength);
 
         if (sourceOriginalText != realOriginalText)
         {
@@ -168,7 +168,7 @@ public sealed class ReverseMapper
                 RequiresReview = true,
                 Reason =
                     "The reverse-mapped text does not match the "
-                    + "original source at the calculated location."
+                    + "original source at the calculated location.",
             };
         }
 
@@ -178,12 +178,7 @@ public sealed class ReverseMapper
          */
         if (!mappedChange.IsSafe)
         {
-            return CreateProtectedPatch(
-                mappedChange,
-                realStart,
-                realLength,
-                sourceOriginalText
-            );
+            return CreateProtectedPatch(mappedChange, realStart, realLength, sourceOriginalText);
         }
 
         /*
@@ -200,8 +195,7 @@ public sealed class ReverseMapper
             OriginalText = sourceOriginalText,
             ReplacementText = change.NewText,
             RequiresReview = false,
-            Reason =
-                "Change does not overlap a protected region."
+            Reason = "Change does not overlap a protected region.",
         };
     }
 
@@ -212,8 +206,7 @@ public sealed class ReverseMapper
         string realOriginalText
     )
     {
-        SanitizedChange change =
-            mappedChange.SourceChange;
+        SanitizedChange change = mappedChange.SourceChange;
 
         /*
          * Alpha safety rule:
@@ -234,12 +227,11 @@ public sealed class ReverseMapper
                 Reason =
                     "Change contains multiple protected regions "
                     + "and cannot be safely reconstructed "
-                    + "automatically."
+                    + "automatically.",
             };
         }
 
-        ProtectedRegion protectedRegion =
-            mappedChange.ProtectedRegions[0];
+        ProtectedRegion protectedRegion = mappedChange.ProtectedRegions[0];
 
         /*
          * The exact dummy value must still exist in the LLM's
@@ -258,17 +250,15 @@ public sealed class ReverseMapper
          * means the protected value was modified and therefore
          * requires human review.
          */
-        int firstDummyStart =
-            change.NewText.IndexOf(
-                protectedRegion.DummyText,
-                StringComparison.Ordinal
-            );
+        int firstDummyStart = change.NewText.IndexOf(
+            protectedRegion.DummyText,
+            StringComparison.Ordinal
+        );
 
-        int lastDummyStart =
-            change.NewText.LastIndexOf(
-                protectedRegion.DummyText,
-                StringComparison.Ordinal
-            );
+        int lastDummyStart = change.NewText.LastIndexOf(
+            protectedRegion.DummyText,
+            StringComparison.Ordinal
+        );
 
         /*
          * Dummy must exist exactly once.
@@ -278,10 +268,7 @@ public sealed class ReverseMapper
          * Multiple occurrences are ambiguous and therefore
          * unsafe to reconstruct automatically.
          */
-        if (
-            firstDummyStart < 0
-            || firstDummyStart != lastDummyStart
-        )
+        if (firstDummyStart < 0 || firstDummyStart != lastDummyStart)
         {
             return new ReversePatch
             {
@@ -294,7 +281,7 @@ public sealed class ReverseMapper
                 Reason =
                     "The protected dummy value was removed, "
                     + "modified, or appears multiple times in "
-                    + "the LLM output."
+                    + "the LLM output.",
             };
         }
 
@@ -304,16 +291,9 @@ public sealed class ReverseMapper
          * The original secret therefore comes exclusively from
          * Aegis's local mapping.
          */
-        string replacementText =
-            change.NewText
-                .Remove(
-                    firstDummyStart,
-                    protectedRegion.DummyText.Length
-                )
-                .Insert(
-                    firstDummyStart,
-                    protectedRegion.OriginalText
-                );
+        string replacementText = change
+            .NewText.Remove(firstDummyStart, protectedRegion.DummyText.Length)
+            .Insert(firstDummyStart, protectedRegion.OriginalText);
 
         return new ReversePatch
         {
@@ -326,8 +306,52 @@ public sealed class ReverseMapper
             Reason =
                 "Protected value was preserved by the LLM and "
                 + "was reconstructed from the original source "
-                + "mapping."
+                + "mapping.",
         };
+    }
+
+    private static bool ContainsDummyOutsideProtectedRegion(
+        SanitizedChange change,
+        IEnumerable<SanitizationMapping> mappings
+    )
+    {
+        foreach (SanitizationMapping mapping in mappings)
+        {
+            int searchStart = 0;
+
+            while (true)
+            {
+                int dummyStart = change.NewText.IndexOf(
+                    mapping.DummyText,
+                    searchStart,
+                    StringComparison.Ordinal
+                );
+
+                if (dummyStart < 0)
+                {
+                    break;
+                }
+
+                int absoluteDummyStart = change.Start + dummyStart;
+
+                int mappingStart = mapping.SanitizedStart;
+
+                int mappingEnd = mapping.SanitizedStart + mapping.SanitizedLength;
+
+                bool insideOriginalRegion =
+                    absoluteDummyStart >= mappingStart
+                    && absoluteDummyStart + mapping.SanitizedLength <= mappingEnd;
+
+                if (!insideOriginalRegion)
+                {
+                    return true;
+                }
+
+                searchStart = dummyStart + mapping.DummyText.Length;
+            }
+        }
+
+        return false;
     }
 
     private static ProtectedRegion? FindProtectedRegion(
@@ -335,58 +359,37 @@ public sealed class ReverseMapper
         SanitizationMapping mapping
     )
     {
-        int changeStart =
-            change.Start;
+        int changeStart = change.Start;
 
-        int changeEnd =
-            change.Start + change.OriginalLength;
+        int changeEnd = change.Start + change.OriginalLength;
 
-        int mappingStart =
-            mapping.SanitizedStart;
+        int mappingStart = mapping.SanitizedStart;
 
-        int mappingEnd =
-            mapping.SanitizedStart
-            + mapping.SanitizedLength;
+        int mappingEnd = mapping.SanitizedStart + mapping.SanitizedLength;
 
         /*
          * No overlap.
          */
-        if (
-            mappingStart >= changeEnd
-            || mappingEnd <= changeStart
-        )
+        if (mappingStart >= changeEnd || mappingEnd <= changeStart)
         {
             return null;
         }
 
-        int overlapStart =
-            Math.Max(
-                changeStart,
-                mappingStart
-            );
+        int overlapStart = Math.Max(changeStart, mappingStart);
 
-        int overlapEnd =
-            Math.Min(
-                changeEnd,
-                mappingEnd
-            );
+        int overlapEnd = Math.Min(changeEnd, mappingEnd);
 
         return new ProtectedRegion
         {
-            Start =
-                overlapStart - changeStart,
+            Start = overlapStart - changeStart,
 
-            Length =
-                overlapEnd - overlapStart,
+            Length = overlapEnd - overlapStart,
 
-            DummyText =
-                mapping.DummyText,
+            DummyText = mapping.DummyText,
 
-            OriginalText =
-                mapping.OriginalText,
+            OriginalText = mapping.OriginalText,
 
-            NodeId =
-                mapping.NodeId,
+            NodeId = mapping.NodeId,
         };
     }
 
@@ -395,17 +398,13 @@ public sealed class ReverseMapper
         IReadOnlyList<SanitizationMapping> mappings
     )
     {
-        int originalPosition =
-            sanitizedPosition;
+        int originalPosition = sanitizedPosition;
 
         foreach (SanitizationMapping mapping in mappings)
         {
-            int sanitizedStart =
-                mapping.SanitizedStart;
+            int sanitizedStart = mapping.SanitizedStart;
 
-            int sanitizedEnd =
-                mapping.SanitizedStart
-                + mapping.SanitizedLength;
+            int sanitizedEnd = mapping.SanitizedStart + mapping.SanitizedLength;
 
             /*
              * This mapping occurs after the position we're
@@ -424,9 +423,7 @@ public sealed class ReverseMapper
              */
             if (sanitizedPosition >= sanitizedEnd)
             {
-                originalPosition -=
-                    mapping.SanitizedLength
-                    - mapping.OriginalLength;
+                originalPosition -= mapping.SanitizedLength - mapping.OriginalLength;
 
                 continue;
             }
@@ -438,8 +435,7 @@ public sealed class ReverseMapper
              * value. For the alpha, map to the beginning of the
              * original protected value.
              */
-            originalPosition =
-                mapping.OriginalStart;
+            originalPosition = mapping.OriginalStart;
 
             break;
         }
@@ -455,38 +451,27 @@ public sealed class ReverseMapper
     {
         failed = false;
 
-        string result =
-            change.OriginalText;
+        string result = change.OriginalText;
 
-        int changeStart =
-            change.Start;
+        int changeStart = change.Start;
 
-        int changeEnd =
-            change.Start + change.OriginalLength;
+        int changeEnd = change.Start + change.OriginalLength;
 
         /*
          * Find mappings that are completely contained inside
          * this changed region.
          */
-        List<SanitizationMapping> containedMappings =
-            mappings
-                .Where(mapping =>
-                {
-                    int mappingStart =
-                        mapping.SanitizedStart;
+        List<SanitizationMapping> containedMappings = mappings
+            .Where(mapping =>
+            {
+                int mappingStart = mapping.SanitizedStart;
 
-                    int mappingEnd =
-                        mapping.SanitizedStart
-                        + mapping.SanitizedLength;
+                int mappingEnd = mapping.SanitizedStart + mapping.SanitizedLength;
 
-                    return
-                        mappingStart >= changeStart
-                        && mappingEnd <= changeEnd;
-                })
-                .OrderByDescending(
-                    mapping => mapping.SanitizedStart
-                )
-                .ToList();
+                return mappingStart >= changeStart && mappingEnd <= changeEnd;
+            })
+            .OrderByDescending(mapping => mapping.SanitizedStart)
+            .ToList();
 
         /*
          * If a mapping overlaps the change but is not completely
@@ -497,20 +482,13 @@ public sealed class ReverseMapper
          */
         foreach (SanitizationMapping mapping in mappings)
         {
-            int mappingStart =
-                mapping.SanitizedStart;
+            int mappingStart = mapping.SanitizedStart;
 
-            int mappingEnd =
-                mapping.SanitizedStart
-                + mapping.SanitizedLength;
+            int mappingEnd = mapping.SanitizedStart + mapping.SanitizedLength;
 
-            bool overlaps =
-                mappingStart < changeEnd
-                && mappingEnd > changeStart;
+            bool overlaps = mappingStart < changeEnd && mappingEnd > changeStart;
 
-            bool contained =
-                mappingStart >= changeStart
-                && mappingEnd <= changeEnd;
+            bool contained = mappingStart >= changeStart && mappingEnd <= changeEnd;
 
             if (overlaps && !contained)
             {
@@ -528,14 +506,9 @@ public sealed class ReverseMapper
          */
         foreach (SanitizationMapping mapping in containedMappings)
         {
-            int relativeStart =
-                mapping.SanitizedStart - changeStart;
+            int relativeStart = mapping.SanitizedStart - changeStart;
 
-            if (
-                relativeStart < 0
-                || relativeStart + mapping.SanitizedLength
-                    > result.Length
-            )
+            if (relativeStart < 0 || relativeStart + mapping.SanitizedLength > result.Length)
             {
                 failed = true;
                 return null;
@@ -545,11 +518,7 @@ public sealed class ReverseMapper
              * Verify that the text at the expected coordinate is
              * actually the dummy text.
              */
-            string actualDummy =
-                result.Substring(
-                    relativeStart,
-                    mapping.SanitizedLength
-                );
+            string actualDummy = result.Substring(relativeStart, mapping.SanitizedLength);
 
             if (actualDummy != mapping.DummyText)
             {
@@ -557,16 +526,9 @@ public sealed class ReverseMapper
                 return null;
             }
 
-            result =
-                result
-                    .Remove(
-                        relativeStart,
-                        mapping.SanitizedLength
-                    )
-                    .Insert(
-                        relativeStart,
-                        mapping.OriginalText
-                    );
+            result = result
+                .Remove(relativeStart, mapping.SanitizedLength)
+                .Insert(relativeStart, mapping.OriginalText);
         }
 
         return result;
