@@ -13,7 +13,7 @@ then safely map useful changes back to the real source.**
 [![Language](https://img.shields.io/badge/language-C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white)]()
 [![Roslyn](https://img.shields.io/badge/analysis-Roslyn-68217A?style=for-the-badge)]()
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)]()
-[![Tests](https://img.shields.io/badge/tests-27%20passing-2ea44f?style=for-the-badge)]()
+[![Tests](https://img.shields.io/badge/tests-37%20passing-2ea44f?style=for-the-badge)]()
 
 <br />
 
