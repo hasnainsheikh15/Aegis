@@ -34,6 +34,10 @@ switch (command)
         Import(args);
         break;
 
+    case "status":
+        Status(args);
+        break;
+
     default:
         Console.WriteLine($"Unknown command: {args[0]}");
         Console.WriteLine();
@@ -77,6 +81,44 @@ static async Task Sanitize(string[] args)
         Console.WriteLine($"Selected file not found: {selectedFilePath}");
 
         return;
+    }
+
+    string activeSessionsDirectory = Path.Combine(projectPath, ".aegis", "sessions");
+
+    if (Directory.Exists(activeSessionsDirectory))
+    {
+        string[] existingSessionFiles = Directory.GetFiles(
+            activeSessionsDirectory,
+            "session.json",
+            SearchOption.AllDirectories
+        );
+
+        SessionStore activeSessionStore = new();
+
+        List<(string Path, AegisSession Session)> existingReadySessions = [];
+
+        foreach (string existingSessionFile in existingSessionFiles)
+        {
+            AegisSession existingSession = activeSessionStore.Load(existingSessionFile);
+
+            if (existingSession.Status == SessionStatus.Ready)
+            {
+                existingReadySessions.Add((existingSessionFile, existingSession));
+            }
+        }
+
+        if (existingReadySessions.Count > 0)
+        {
+            Console.WriteLine("An active Aegis session already exists.");
+
+            Console.WriteLine($"Session: {existingReadySessions[0].Session.SessionId}");
+
+            Console.WriteLine();
+
+            Console.WriteLine("Run aegis apply before starting another session.");
+
+            return;
+        }
     }
 
     int selectionStart;
@@ -541,16 +583,90 @@ static async Task Sanitize(string[] args)
     Console.WriteLine($"     aegis import \"{sessionFilePath}\"");
 }
 
+static void Status(string[] args)
+{
+    string projectPath =
+        args.Length >= 2 ? Path.GetFullPath(args[1]) : Directory.GetCurrentDirectory();
+
+    string sessionsDirectory = Path.Combine(projectPath, ".aegis", "sessions");
+
+    if (!Directory.Exists(sessionsDirectory))
+    {
+        Console.WriteLine("""{"status":"none"}""");
+        return;
+    }
+
+    string[] sessionFiles = Directory.GetFiles(
+        sessionsDirectory,
+        "session.json",
+        SearchOption.AllDirectories
+    );
+
+    if (sessionFiles.Length == 0)
+    {
+        Console.WriteLine("""{"status":"none"}""");
+        return;
+    }
+
+    SessionStore sessionStore = new SessionStore();
+
+    List<string> readySessions = [];
+
+    foreach (string sessionFile in sessionFiles)
+    {
+        AegisSession session = sessionStore.Load(sessionFile);
+
+        if (session.Status == SessionStatus.Ready)
+        {
+            readySessions.Add(sessionFile);
+        }
+    }
+
+    if (readySessions.Count == 0)
+    {
+        Console.WriteLine("""{"status":"none"}""");
+        return;
+    }
+
+    if (readySessions.Count > 1)
+    {
+        Console.WriteLine("""{"status":"multiple"}""");
+        return;
+    }
+
+    string activeSessionPath = readySessions[0];
+
+    AegisSession activeSession = sessionStore.Load(activeSessionPath);
+
+    string filesJson = string.Join(
+        ",",
+        activeSession.Files.Select(file =>
+            $$"""{"name":"{{Path.GetFileName(file.OriginalFilePath)}}","status":"protected"}"""
+        )
+    );
+
+    Console.WriteLine(
+        $$"""
+        {
+          "status": "ready",
+          "sessionId": "{{activeSession.SessionId}}",
+          "sessionPath": "{{activeSessionPath.Replace("\\", "\\\\")}}",
+          "files": [{{filesJson}}]
+        }
+        """
+    );
+}
+
 static void Apply(string[] args)
 {
     string projectPath =
         args.Length >= 2 ? Path.GetFullPath(args[1]) : Directory.GetCurrentDirectory();
 
-    Console.WriteLine($"Project: {projectPath}");
+    // Console.WriteLine($"Project: {projectPath}");
 
     string sessionsDirectory = Path.Combine(projectPath, ".aegis", "sessions");
 
-    Console.WriteLine($"Sessions: {sessionsDirectory}");
+    // Console.WriteLine($"Sessions: {sessionsDirectory}");
 
     if (!Directory.Exists(sessionsDirectory))
     {
@@ -577,9 +693,42 @@ static void Apply(string[] args)
         return;
     }
 
-    Console.WriteLine($"Applying session: {sessionFiles[0]}");
+    SessionStore sessionStore = new();
 
-    Import(["import", sessionFiles[0]]);
+    List<(string Path, AegisSession Session)> readySessions = [];
+
+    foreach (string sessionFile in sessionFiles)
+    {
+        AegisSession session = sessionStore.Load(sessionFile);
+
+        if (session.Status == SessionStatus.Ready)
+        {
+            readySessions.Add((sessionFile, session));
+        }
+    }
+
+    if (readySessions.Count == 0)
+    {
+        Console.WriteLine("No Aegis sessions found.");
+
+        return;
+    }
+
+    if (readySessions.Count > 1)
+    {
+        Console.WriteLine(
+            "Multiple Aegis sessions found. The alpha requires exactly one active session."
+        );
+
+        return;
+    }
+
+    string sessionFilePath = readySessions[0].Path;
+    AegisSession activeSession = readySessions[0].Session;
+
+    Console.WriteLine($"Session: {activeSession.SessionId}");
+
+    Import(["import", sessionFilePath]);
 }
 static void Import(string[] args)
 {
