@@ -602,7 +602,23 @@ Before opening a pull request:
 dotnet test
 dotnet build
 ```
+📚 Documentation
 
+objective.md — Product objective and design goals
+
+ARCHITECTURE.md — Current Roslyn/PIR architecture
+
+SECURITY.md — Security model and limitations
+
+TECH_DEBT.md — Deferred architectural improvements
+
+📦 Release
+
+v0.1.0-alpha.1
+
+The first public Aegis alpha.
+
+[View the release →](https://github.com/hasnainsheikh15/Aegis/releases/tag/v0.1.0-alpha.1)
 ---
 
 ## ⚖️ Security Notice
