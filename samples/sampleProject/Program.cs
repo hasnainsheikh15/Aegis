@@ -6,7 +6,7 @@ public class AuthService
 
     public void Login()
     {
-        string token = Hash(password).Trim().ToLower();
+        string token = Hash(password).Trim();
         string backup = token;
 
 

@@ -483,6 +483,29 @@ static void Import(string[] args)
 
     foreach (ImportedFileResult fileResult in importResult.Files)
     {
+        if (fileResult.RequiresReview)
+        {
+            hadReview = true;
+            hadChanges = true;
+
+            Console.WriteLine($"Review required: {fileResult.OriginalFilePath}");
+
+            foreach (string reason in fileResult.ReviewReasons)
+            {
+                Console.WriteLine($"  {reason}");
+            }
+
+            foreach (ReversePatch patch in fileResult.Patches)
+            {
+                if (patch.RequiresReview && !string.IsNullOrWhiteSpace(patch.Reason))
+                {
+                    Console.WriteLine($"  {patch.Reason}");
+                }
+            }
+
+            continue;
+        }
+
         if (fileResult.Changes.Count == 0)
         {
             continue;
@@ -510,28 +533,6 @@ static void Import(string[] args)
             continue;
         }
 
-        if (fileResult.RequiresReview)
-        {
-            hadReview = true;
-
-            Console.WriteLine($"Review required: {fileResult.OriginalFilePath}");
-
-            foreach (string reason in fileResult.ReviewReasons)
-            {
-                Console.WriteLine($"  {reason}");
-            }
-
-            foreach (ReversePatch patch in fileResult.Patches)
-            {
-                if (patch.RequiresReview && !string.IsNullOrWhiteSpace(patch.Reason))
-                {
-                    Console.WriteLine($"  {patch.Reason}");
-                }
-            }
-
-            continue;
-        }
-
         PatchApplicationResult applicationResult = patchApplicationService.Apply(
             fileResult.OriginalFilePath,
             sessionFile.OriginalSourceHash,
@@ -556,7 +557,6 @@ static void Import(string[] args)
 
         Console.WriteLine($"Applied: {fileResult.OriginalFilePath}");
     }
-
     if (!hadChanges)
     {
         Console.WriteLine("No changes were detected.");

@@ -312,4 +312,123 @@ public sealed class SessionImporterTests
             }
         }
     }
+
+    [Fact]
+    public void Import_WhenOriginalSourceChangedAfterSessionCreation_RequiresReview()
+    {
+        string originalSource = """
+            public class TestClass
+            {
+                private string password = "abc123";
+            }
+            """;
+
+        string modifiedOriginalSource = """
+            public class TestClass
+            {
+                private string password = "changed-after-session";
+            }
+            """;
+
+        string sanitizedSource = """
+            public class TestClass
+            {
+                private string password = "DUMMY_PASSWORD";
+            }
+            """;
+
+        string modifiedSanitizedSource = """
+            public class TestClass
+            {
+                private string password = "DUMMY_PASSWORD";
+            }
+            """;
+
+        string tempDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "aegis-session-import-test-" + Guid.NewGuid()
+        );
+
+        Directory.CreateDirectory(tempDirectory);
+
+        try
+        {
+            string originalFilePath = Path.Combine(tempDirectory, "Program.cs");
+
+            string sanitizedDirectory = Path.Combine(tempDirectory, ".aegis", "sanitized");
+
+            string baselineDirectory = Path.Combine(tempDirectory, ".aegis", "baseline");
+
+            Directory.CreateDirectory(sanitizedDirectory);
+            Directory.CreateDirectory(baselineDirectory);
+
+            string sanitizedFilePath = Path.Combine(sanitizedDirectory, "Program.cs");
+
+            string baselineSanitizedFilePath = Path.Combine(baselineDirectory, "Program.cs");
+
+            File.WriteAllText(originalFilePath, originalSource);
+            File.WriteAllText(sanitizedFilePath, modifiedSanitizedSource);
+            File.WriteAllText(baselineSanitizedFilePath, sanitizedSource);
+
+            SourceHasher sourceHasher = new();
+
+            AegisSession session = new()
+            {
+                Version = 1,
+                SessionId = Guid.NewGuid().ToString("N"),
+                Files =
+                [
+                    new SessionFile
+                    {
+                        OriginalFilePath = originalFilePath,
+                        SanitizedFilePath = sanitizedFilePath,
+                        BaselineSanitizedFilePath = baselineSanitizedFilePath,
+                        OriginalSourceHash = sourceHasher.Compute(originalSource),
+                        SanitizedSourceHash = sourceHasher.Compute(sanitizedSource),
+                        Mappings = [],
+                    },
+                ],
+            };
+
+            string sessionFilePath = Path.Combine(tempDirectory, "session.json");
+
+            SessionStore sessionStore = new();
+
+            sessionStore.Save(session, sessionFilePath);
+
+            // Simulate the real source changing after
+            // the Aegis session was created.
+            File.WriteAllText(originalFilePath, modifiedOriginalSource);
+
+            SessionImporter importer = new(
+                sessionStore,
+                new SourceHasher(),
+                new SanitizedChangeDetector(),
+                new ReverseMapper()
+            );
+
+            ImportResult result = importer.Import(sessionFilePath);
+
+            ImportedFileResult fileResult = Assert.Single(result.Files);
+
+            Assert.True(fileResult.RequiresReview);
+
+            Assert.Contains(
+                "Original source changed after the session was created.",
+                fileResult.ReviewReasons
+            );
+
+            Assert.Empty(fileResult.Patches);
+
+            // Most importantly: the changed real source must remain untouched.
+            Assert.Equal(modifiedOriginalSource, File.ReadAllText(originalFilePath));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDirectory))
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+        }
+    }
 }
