@@ -4,7 +4,7 @@
 
 ### Privacy infrastructure for AI-assisted software development.
 
-**Sanitize proprietary code before it reaches an external LLM —  
+**Sanitize proprietary code before it reaches an external LLM —
 then safely map useful changes back to the real source.**
 
 <br />
@@ -12,7 +12,7 @@ then safely map useful changes back to the real source.**
 [![Status](https://img.shields.io/badge/status-alpha-orange?style=for-the-badge)]()
 [![Language](https://img.shields.io/badge/language-C%23-512BD4?style=for-the-badge&logo=csharp&logoColor=white)]()
 [![Roslyn](https://img.shields.io/badge/analysis-Roslyn-68217A?style=for-the-badge)]()
-[![.NET](https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)]()
 [![Tests](https://img.shields.io/badge/tests-37%20passing-2ea44f?style=for-the-badge)]()
 
 <br />
@@ -74,7 +74,7 @@ Instead of sending real source directly to an external LLM:
 
 ```
 ┌──────────────┐
-│  Real Source  │
+│  Real Source │
 └──────┬───────┘
        │
        ▼
@@ -86,7 +86,7 @@ Instead of sending real source directly to an external LLM:
        │
        ▼
 ┌──────────────┐
-│ Dummy Source  │
+│ Dummy Source │
 └──────┬───────┘
        │
        ▼
@@ -251,52 +251,52 @@ The analysis infrastructure exists to make the privacy transformation reliable.
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│                         AEGIS                             │
+│                          AEGIS                             │
 ├───────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌───────────────┐        ┌────────────────────────────┐  │
-│  │    Roslyn     │───────▶│            PIR             │  │
-│  │    Worker     │        │ Program Intermediate       │  │
-│  └───────────────┘        │ Representation             │  │
-│                           └─────────────┬──────────────┘  │
-│                                         │                 │
-│                                         ▼                 │
-│                           ┌────────────────────────────┐  │
-│                           │        Graph Engine        │  │
-│                           │                            │  │
-│                           │ Dependencies               │  │
-│                           │ Data Flow                  │  │
-│                           │ Relationships              │  │
-│                           │ Sensitivity                │  │
-│                           └─────────────┬──────────────┘  │
-│                                         │                 │
-│                                         ▼                 │
-│                           ┌────────────────────────────┐  │
-│                           │       Sanitizer            │  │
-│                           │                            │  │
-│                           │ Real → Dummy               │  │
-│                           │ Mapping                    │  │
-│                           │ Sessions                   │  │
-│                           └─────────────┬──────────────┘  │
-│                                         │                 │
-│                                         ▼                 │
-│                           ┌────────────────────────────┐  │
-│                           │      Reverse Mapper        │  │
-│                           │                            │  │
-│                           │ Dummy → Real               │  │
-│                           │ Change Detection           │  │
-│                           │ Protected Regions          │  │
-│                           └─────────────┬──────────────┘  │
-│                                         │                 │
-│                                         ▼                 │
-│                           ┌────────────────────────────┐  │
-│                           │       Patch Engine         │  │
-│                           │                            │  │
-│                           │ Integrity Checks           │  │
-│                           │ Syntax Validation          │  │
-│                           │ Safe Application           │  │
-│                           └────────────────────────────┘  │
-│                                                           │
+│                                                             │
+│  ┌───────────────┐        ┌────────────────────────────┐   │
+│  │    Roslyn     │───────▶│            PIR             │   │
+│  │    Worker     │        │ Program Intermediate       │   │
+│  └───────────────┘        │ Representation             │   │
+│                            └─────────────┬──────────────┘   │
+│                                          │                  │
+│                                          ▼                  │
+│                            ┌────────────────────────────┐   │
+│                            │        Graph Engine        │   │
+│                            │                             │   │
+│                            │ Dependencies                │   │
+│                            │ Data Flow                   │   │
+│                            │ Relationships                │  │
+│                            │ Sensitivity                  │  │
+│                            └─────────────┬──────────────┘   │
+│                                          │                  │
+│                                          ▼                  │
+│                            ┌────────────────────────────┐   │
+│                            │       Sanitizer             │   │
+│                            │                             │   │
+│                            │ Real → Dummy                │   │
+│                            │ Mapping                     │   │
+│                            │ Sessions                    │   │
+│                            └─────────────┬──────────────┘   │
+│                                          │                  │
+│                                          ▼                  │
+│                            ┌────────────────────────────┐   │
+│                            │      Reverse Mapper         │   │
+│                            │                             │   │
+│                            │ Dummy → Real                │   │
+│                            │ Change Detection             │  │
+│                            │ Protected Regions             │ │
+│                            └─────────────┬──────────────┘   │
+│                                          │                  │
+│                                          ▼                  │
+│                            ┌────────────────────────────┐   │
+│                            │       Patch Engine          │   │
+│                            │                             │   │
+│                            │ Integrity Checks             │  │
+│                            │ Syntax Validation             │ │
+│                            │ Safe Application               ││
+│                            └────────────────────────────┘   │
+│                                                             │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -362,79 +362,107 @@ See [SECURITY.md](SECURITY.md) for the complete security model and current limit
 
 ## 🚀 Quick Start
 
-### Requirements
+### Installation
 
-- .NET 10 SDK
-- Git
+Aegis is currently distributed as an alpha release through GitHub.
 
-### Clone the repository
+#### Requirements
+
+- Windows x64
+- Node.js 20+
+- npm
+
+> **You do not need to install the .NET SDK or .NET runtime.**
+> Aegis bundles its Roslyn analysis worker as a self-contained executable.
+
+#### Install from GitHub
+
+Open a terminal and run:
 
 ```bash
-git clone <repository-url>
-cd Aegis
+npm install -g https://github.com/hasnainsheikh15/Aegis.git
 ```
 
-### Run the test suite
+Verify the installation:
 
 ```bash
-dotnet test
+aegis help
 ```
 
-### Build the Roslyn worker
+You should see the Aegis CLI help.
+
+### Protect Your Code
+
+Navigate to your project:
 
 ```bash
-dotnet build apps/roslyn-worker/RoslynWorker.csproj
+cd path/to/your/project
+```
+
+Then protect a file:
+
+```bash
+aegis protect src/AuthService.cs
+```
+
+Aegis will analyze the project and create a sanitized version of the selected code.
+
+### Review and Send the Sanitized Code
+
+Review the generated sanitized files before sending them to an external LLM.
+
+Aegis replaces sensitive values with safe dummy values while preserving the surrounding code structure and context.
+
+You can send the sanitized source to your preferred LLM — Aegis does not require a specific LLM provider.
+
+### Apply the LLM Changes
+
+After modifying the sanitized files with the changes requested from your LLM, run:
+
+```bash
+aegis apply
+```
+
+Aegis validates the changes, maps them back to the original source, and applies the safe changes to your real code.
+
+### Check the Current Session
+
+At any time, you can check the active Aegis session with:
+
+```bash
+aegis status
+```
+
+### Workflow
+
+```
+Your real source
+      │
+      ▼
+aegis protect <file>
+      │
+      ▼
+Sanitized source
+      │
+      ▼
+Your preferred LLM
+      │
+      ▼
+Modified sanitized source
+      │
+      ▼
+aegis apply
+      │
+      ▼
+Validated changes
+      │
+      ▼
+Your real source
 ```
 
 ---
 
-## 🧪 Try the Alpha
 
-The current CLI is intentionally minimal.
-
-### Sanitize a selected region
-
-```bash
-dotnet run --project apps/roslyn-worker -- \
-  sanitize \
-  <project-folder> \
-  <file-path> \
-  <start> \
-  <length>
-```
-
-**Example:**
-
-```bash
-dotnet run --project apps/roslyn-worker -- \
-  sanitize \
-  ./samples/sampleProject \
-  ./samples/sampleProject/Program.cs \
-  194 \
-  24
-```
-
-Aegis creates a local session under:
-
-```
-.aegis/sessions/<session-id>/
-```
-
-The session contains the sanitized representation and the mapping information required for the return trip.
-
-### Import changes from the LLM
-
-After modifying the sanitized source with your LLM:
-
-```bash
-dotnet run --project apps/roslyn-worker -- \
-  import \
-  <path-to-session.json>
-```
-
-Aegis will detect, map, validate, and either apply or reject the resulting changes.
-
----
 
 ## 📦 Repository Structure
 
@@ -469,7 +497,7 @@ Aegis/
 
 ## 🧪 Testing
 
-The project currently has **27 automated tests** covering the sanitizer and round-trip pipeline.
+The project currently has **37 automated tests** covering the sanitizer and round-trip pipeline.
 
 Important scenarios include:
 
@@ -602,23 +630,15 @@ Before opening a pull request:
 dotnet test
 dotnet build
 ```
-📚 Documentation
 
-objective.md — Product objective and design goals
+---
 
-ARCHITECTURE.md — Current Roslyn/PIR architecture
+## 📦 Release
 
-SECURITY.md — Security model and limitations
-
-TECH_DEBT.md — Deferred architectural improvements
-
-📦 Release
-
-v0.1.0-alpha.1
-
-The first public Aegis alpha.
+**v0.1.0-alpha.1** — the first public Aegis alpha.
 
 [View the release →](https://github.com/hasnainsheikh15/Aegis/releases/tag/v0.1.0-alpha.1)
+
 ---
 
 ## ⚖️ Security Notice

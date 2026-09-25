@@ -580,7 +580,7 @@ static async Task Sanitize(string[] args)
     Console.WriteLine("  3. Modify the sanitized files with the requested changes.");
     Console.WriteLine("  4. Run:");
     Console.WriteLine();
-    Console.WriteLine($"     aegis import \"{sessionFilePath}\"");
+    Console.WriteLine($"       aegis apply");
 }
 
 static void Status(string[] args)
@@ -921,7 +921,7 @@ static void WriteSessionReadme(string sessionDirectory, AegisSession session)
         "6. Import the session with:",
         "",
         "```bash",
-        $"aegis import \"{sessionFilePath}\"",
+        "aegis apply",
         "```",
         "",
         "Aegis compares the modified sanitized source against the trusted baseline.",
