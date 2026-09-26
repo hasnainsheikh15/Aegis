@@ -380,7 +380,7 @@ Aegis is currently distributed as an alpha release through GitHub.
 Open a terminal and run:
 
 ```bash
-npm install -g https://github.com/hasnainsheikh15/Aegis.git
+npm install -g @npm_hasnain/aegis-cli
 ```
 
 Verify the installation:
