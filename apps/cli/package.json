@@ -1,6 +1,6 @@
 {
-  "name": "@aegis/cli",
-  "version": "0.1.0",
+  "name": "@npm_hasnain/aegis-cli",
+  "version": "0.1.1",
   "type": "module",
   "description": "Aegis CLI for privacy-preserving AI-assisted software development",
   "scripts": {
@@ -9,15 +9,15 @@
     "dev": "tsx src/main.ts"
   },
   "bin": {
-  "aegis": "dist/main.js"
-},
-"files": [
-  "dist",
-  "worker"
-],
-"engines": {
-  "node": ">=20"
-},
+    "aegis": "dist/main.js"
+  },
+  "files": [
+    "dist",
+    "worker"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@types/node": "^26.6.2",
